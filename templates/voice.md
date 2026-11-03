@@ -49,8 +49,12 @@ Single / double / three:
 - गैप में खेलकर दो फील्डर्स के बीच से बढ़िया रनिंग, आसानी से दो रन पूरे किए!
 - शानदार रनिंग बिटवीन द विकेट्स, दोनों बल्लेबाज़ों ने दौड़कर तीन रन पूरे किए!
 
-TODO: a few lines for wickets, wides, no-balls and overs ending, plus anything you say in
-Hinglish (Roman letters) so the skills know when to switch script.
+Wicket (caught). `{who}` is the batter out, `{fielder}` took the catch, `{bowler}` got the wicket:
+- गेंद हवा में उठी... और सुरक्षित हाथों में! {fielder} ने कैच लपक लिया! विकेट! {who} पवेलियन लौट रहे हैं, {bowler} को मिली बड़ी कामयाबी!
+- बड़ा विकेट! शॉट गलत लगा और {fielder} ने कोई गलती नहीं की! {who} कैच आउट, {bowler} की गेंद पर!
+
+TODO: lines for other dismissals (bowled, LBW, run out, stumped), wides, no-balls and the end of an
+over, plus anything you say in Hinglish (Roman letters) so the skills know when to switch script.
 
 ## Words I never use
 
@@ -63,8 +67,9 @@ Hinglish (Roman letters) so the skills know when to switch script.
 - Greeting, as I say it: "welcome dosto aj match ha india vs new Zealand ke beech mein" (swap in
   the two teams for each match).
 - Big six: "उठाकर मारा! गेंद आसमान में... बहुत ऊंची... और ये गई स्टैंड्स में! छह रन!"
-- TODO: sign-off, and your calls for a wicket, a four, a dot ball and a close finish. Keep them
-  exactly as you say them.
+- Wicket: "गेंद हवा में उठी... और सुरक्षित हाथों में!" then the fielder's name and "विकेट!"
+- TODO: sign-off, and your calls for a dot ball and a close finish. Keep them exactly as you say
+  them.
 
 ## What I will not claim
 
