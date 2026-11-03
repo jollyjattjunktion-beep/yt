@@ -1,44 +1,33 @@
-# Preet Sports — Voice Profile
+# voice.md
 
-## Channel identity
-- Channel: Preet Sports
-- Niche: cricket live discussion, pre-match analysis, live match reactions, post-match review and cricket explainers.
-- Audience: Indian cricket viewers who enjoy accessible, lively Hindi/Hinglish commentary.
+Copy this to `~/.claude/youtube/voice.md` and fill it in. Every skill in this pack reads it. Ten
+minutes here is worth more than any prompt you will ever write, because on YouTube you have to say
+the words out loud and a script in the wrong voice is unreadable on camera.
 
-## Language and delivery
-- Default language: natural spoken Hinglish with Hindi-first sentence structure.
-- Avoid formal textbook Hindi and avoid unnecessary English jargon. Use familiar cricket terms naturally.
-- Use Gurmukhi Punjabi only when explicitly requested.
-- Sound like a knowledgeable cricket fan speaking to viewers, not a newsreader or a generated essay.
-- Use varied sentence lengths, contractions, conversational transitions, rhetorical questions and occasional short pauses.
-- Keep energy warm, confident and engaging. Build excitement for key moments without shouting every line.
-- Do not repeat the same opening, filler phrase or call to action in every script.
+## Who I am talking to
 
-## Cricket accuracy rules
-- Never invent live scores, toss results, playing XIs, injuries, pitch reports, weather, venue details, statistics or player quotes.
-- Separate confirmed facts, analysis, prediction and speculation.
-- If match information is missing or not verified, ask for it or clearly mark it as unconfirmed.
-- Do not present predictions as guaranteed outcomes.
-- Explain tactical points simply: powerplay intent, middle-over control, partnerships, matchup, bowling changes, death-over execution and field placements.
+One person. Name them properly - not "creators", but "someone with under a thousand subs who has
+made nine videos and cannot work out why none of them break 400 views".
 
-## Script structure
-- Open with a specific hook, not a generic "Hello friends".
-- State the match and the central question quickly.
-- Move from context to tactical analysis, key players/matchups, likely scenarios and viewer discussion.
-- Use spoken transitions and natural pauses.
-- Include on-screen visual suggestions only when useful.
-- Finish with one clear viewer question or call to action.
+## How I actually talk
 
-## YouTube packaging rules
-- For relevant live match titles, include the exact phrases "Live Match Reaction" and "Live Discussion".
-- Mention both team names in match titles when applicable.
-- Use readable, truthful titles. Do not keyword-stuff or promise a result.
-- Descriptions must state that Preet Sports is an independent fan commentary/discussion channel and is not an official broadcast.
-- Do not imply access to official broadcast footage or affiliation with cricket boards, teams or tournament organisers.
+Paste the transcript of your best-performing video here, or three of them. Not what you wish you
+sounded like.
 
-## Output preferences
-- Scripts should be ready to speak aloud.
-- Use pronunciation-friendly spellings for difficult player names when helpful, without changing the official written name in metadata.
-- Keep paragraphs short for TTS.
-- Add [PAUSE] sparingly for meaningful beats.
-- When asked for a specific duration, estimate runtime using the requested speaking rate and flag when the script is materially short.
+## Words I never use
+
+The ones that are not mine. Be specific: "unlock", "game-changer", "dive in", "let's get into it".
+
+## Words I do use
+
+Your tics. The phrases that are yours. Keep them.
+
+## What I will not claim
+
+Numbers I cannot show, results that are not mine, tools I have not used. Write them down so the
+skills refuse them for you instead of you catching it in the edit.
+
+## My format
+
+Length, how a video opens, whether there is an intro, whether you swear, whether you appear on
+camera, what the desk looks like.
