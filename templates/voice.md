@@ -7,26 +7,28 @@ Copy this to `~/.claude/youtube/voice.md`. Every skill in this pack reads it. Li
 
 ## Who I am talking to
 
-A cricket fan in the Hindi-speaking world who is following a match right
-now, often on a phone, often with the TV off or muted or not available. They want the score, what
-just happened, and what is likely to happen next, in a language they think in. They do not want a
+A cricket fan in the Hindi-speaking world who is following a match right now, often on a phone,
+often because they cannot watch the match itself. They want the score, what just happened on that
+ball, and what is likely to happen next, in the language they actually speak. They do not want a
 lecture on cricket basics.
 
 TODO: sharpen this to one real person (age, where they watch, which tournaments they never miss).
 
 ## How I actually talk
 
-- Language: Hindi, the way viewers speak it, not stiff or translated word for word.
-- Live commentary is original audio, ball by ball, with the score kept current.
+- Language: Hinglish, Hindi and English mixed the way cricket fans really talk. Not formal Hindi,
+  not translated word for word.
+- Live commentary on every ball, in real time, as a live stream.
+- The OBS scoreboard stays on screen and current while I talk, so I can refer to the score on
+  screen.
 - Analysis is pre-match and post-match: pitch report, playing XI, a prediction with reasons.
-- TODO: paste the transcripts of your three best videos here. The skills copy your real rhythm from
-  these, so this section matters most.
+- TODO: paste the transcripts of your three best videos or streams here. The skills copy your real
+  rhythm from these, so this section matters most.
 
 ## Words I never use
 
 - "Unlock", "game-changer", "dive in", "let's get into it" - generic YouTube filler.
-- Anything that implies video: "as you can see", "watch this", "on your screen". The channel does
-  not stream live video, so scripts must work as audio only.
+- Pure Sanskritised Hindi that nobody says on a cricket ground.
 - TODO: add the commentary clichés you refuse to say.
 
 ## Words I do use
@@ -36,7 +38,9 @@ big six. Keep them exactly as you say them, in the script you actually speak.
 
 ## What I will not claim
 
-- That the channel streams live video. It does not.
+- That I am showing the match itself. The stream is my commentary over an OBS scoreboard, not
+  match footage or the broadcaster's feed. (The channel's own disclaimer says it does not stream
+  live match video.)
 - That scores are official or from the broadcaster. They come from public sources, and the script
   can say so.
 - That a prediction is certain or insider information. Predictions are my read of pitch, form and
@@ -46,8 +50,9 @@ big six. Keep them exactly as you say them, in the script you actually speak.
 
 ## My format
 
-- Content: live commentary, scores, pitch reports, playing XIs and predictions, in Hindi.
+- Content: live ball-by-ball commentary, scores, pitch reports, playing XIs and predictions.
+- Language: Hinglish.
 - Coverage: international matches, IPL and PSL.
-- Delivery: audio commentary, no live video stream.
-- TODO: typical video length, how a video opens, whether there is an intro, how you close, whether
+- Delivery: live stream with original commentary audio over an OBS scoreboard overlay.
+- TODO: typical stream length, how a stream opens, whether there is an intro, how you close, whether
   you appear on camera.
