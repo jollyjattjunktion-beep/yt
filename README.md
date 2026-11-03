@@ -1,6 +1,6 @@
 # The YouTube agent skill
 
-**Channel:** [Preet Sports](https://www.youtube.com/@Preetsportslive) (@Preetsportslive) — cricket live commentary, score updates, and match analysis in Punjabi, Hindi and English. This repo holds the skills used to plan and script that channel.
+**Channel:** [Preet Sports](https://www.youtube.com/@Preetsportslive) (@Preetsportslive) — cricket live commentary, score updates, and match analysis in Hindi. This repo holds the skills used to plan and script that channel.
 
 Eleven Claude skills that run a YouTube channel. Free, MIT, no signup, no API key, nothing to
 connect.

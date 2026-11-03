@@ -7,7 +7,7 @@ Copy this to `~/.claude/youtube/voice.md`. Every skill in this pack reads it. Li
 
 ## Who I am talking to
 
-A cricket fan in Punjab and across the Hindi-Punjabi-speaking world who is following a match right
+A cricket fan in the Hindi-speaking world who is following a match right
 now, often on a phone, often with the TV off or muted or not available. They want the score, what
 just happened, and what is likely to happen next, in a language they think in. They do not want a
 lecture on cricket basics.
@@ -16,9 +16,7 @@ TODO: sharpen this to one real person (age, where they watch, which tournaments 
 
 ## How I actually talk
 
-- Languages: Punjabi, Hindi and English, mixed the way viewers speak, not translated word for word.
-  TODO: say which language leads which video type (e.g. Punjabi for live commentary, Hindi or
-  English for analysis).
+- Language: Hindi, the way viewers speak it, not stiff or translated word for word.
 - Live commentary is original audio, ball by ball, with the score kept current.
 - Analysis is pre-match and post-match: pitch report, playing XI, a prediction with reasons.
 - TODO: paste the transcripts of your three best videos here. The skills copy your real rhythm from
@@ -48,8 +46,7 @@ big six. Keep them exactly as you say them, in the script you actually speak.
 
 ## My format
 
-- Content: live commentary and score updates, pre-match and post-match analysis, pitch reports,
-  playing XIs, match predictions.
+- Content: live commentary, scores, pitch reports, playing XIs and predictions, in Hindi.
 - Coverage: international matches, IPL and PSL.
 - Delivery: audio commentary, no live video stream.
 - TODO: typical video length, how a video opens, whether there is an intro, how you close, whether
