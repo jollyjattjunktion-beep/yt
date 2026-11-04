@@ -737,10 +737,18 @@ def apply_stadium_effects(raw_voice_path: str, output_path: str) -> bool:
 def humanize_text(text: str) -> str:
     """Forces the AI to 'breathe' like a human by injecting micro-pauses at punctuation."""
     clean = re.sub(r"<[^>]+>", " ", text).replace("\r", " ").replace("\n", " ").strip()
-    clean = clean.replace("!", "!... ")
-    clean = clean.replace("।", "।... ")
-    clean = clean.replace(",", ",... ")
-    return clean
+    # A short pause after "!" and "।" only. Pausing on every comma made the voice stutter.
+    clean = clean.replace("!", "! ").replace("।", "। ")
+    clean = re.sub(r"\.{3,}", "... ", clean)
+    return re.sub(r"\s+", " ", clean).strip()
+
+
+def jitter_profile(rate: str, pitch: str, vol: str) -> tuple[str, str, str]:
+    """Vary rate and pitch a little on every line so no two lines sound identical."""
+    def shift(value: str, spread: int, unit: str) -> str:
+        base = int(re.sub(r"[^\d\-+]", "", value) or 0)
+        return f"{base + random.randint(-spread, spread):+d}{unit}"
+    return shift(rate, 4, "%"), shift(pitch, 3, "Hz"), vol
 
 
 async def generate_and_play_audio(text: str, rate_level: int = 2) -> None:
@@ -751,7 +759,7 @@ async def generate_and_play_audio(text: str, rate_level: int = 2) -> None:
     clean_text = humanize_text(text)
     
     # Unpack all three variables (rate, pitch, volume) from your updated AUDIO_PROFILES
-    rate_str, pitch_str, vol_str = AUDIO_PROFILES[min(max(rate_level, 1), 4)] 
+    rate_str, pitch_str, vol_str = jitter_profile(*AUDIO_PROFILES[min(max(rate_level, 1), 4)]) 
     
     temp_dir = tempfile.gettempdir()
     raw_mp3 = os.path.join(temp_dir, f"_raw_{os.getpid()}_{time.time_ns()}.mp3")
