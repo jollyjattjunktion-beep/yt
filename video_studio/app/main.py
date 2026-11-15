@@ -37,13 +37,17 @@ async def run_job(job_id: str, req: MatchRequest):
         JOBS[job_id]["status"]="rendering"
         folder=settings.output_dir/safe_name(req.match_name)/job_id
         result=await render_video(script,req.match_name,folder,req.voice)
+        JOBS[job_id].update(status="rendered",result=result,research=research)
         if req.publish_to_youtube:
             JOBS[job_id]["status"]="publishing"
             uploads=[]
-            for video in result["videos"]:
-                upload=await asyncio.to_thread(upload_video,video,result["metadata"],req.privacy_status)
-                uploads.append(upload)
-            result["youtube_uploads"]=uploads
+            try:
+                for video in result["videos"]:
+                    upload=await asyncio.to_thread(upload_video,video,result["metadata"],req.privacy_status)
+                    uploads.append(upload)
+                result["youtube_uploads"]=uploads
+            except Exception as publish_error:
+                result["publish_error"]=str(publish_error)
         JOBS[job_id].update(status="completed",result=result,research=research)
     except Exception as exc:
         JOBS[job_id].update(status="failed",error=str(exc))
