@@ -132,7 +132,7 @@ class CricketSceneRenderer {
                     val x=width*(.08f+n*.29f);p.color=Color.rgb(18,48,70);c.drawRoundRect(RectF(x,height*.29f,x+width*.25f,height*.67f),20f,20f,p)
                     p.color=if(n==1) cyan else gold;c.drawCircle(x+width*.125f,height*.41f,width*.072f,p)
                     p.color=Color.rgb(8,26,43);c.drawCircle(x+width*.125f,height*.40f,width*.047f,p)
-                    p.color=Color.WHITE;p.textSize=width*.022f;p.textAlign=Paint.Align.CENTER;c.drawText("PHOTO SLOT",x+width*.125f,height*.56f,p)
+                    p.color=Color.WHITE;p.textSize=width*.022f;p.textAlign=Paint.Align.CENTER;c.drawText("PLAYER FOCUS",x+width*.125f,height*.56f,p)
                     p.color=gold;c.drawText(roles[n],x+width*.125f,height*.62f,p);p.textAlign=Paint.Align.LEFT
                 }
                 smallCenter(c,p,"ADD CONFIRMED PLAYERS & HEADSHOTS",width,height*.77f)
@@ -186,22 +186,38 @@ class CricketSceneRenderer {
         return bitmap
     }
 
+    private fun sourceCrop(photo:Bitmap, target:RectF):android.graphics.Rect {
+        val targetRatio=target.width()/target.height()
+        val sourceRatio=photo.width.toFloat()/photo.height.toFloat()
+        return if(sourceRatio>targetRatio) {
+            val cropWidth=(photo.height*targetRatio).toInt().coerceAtLeast(1)
+            val left=(photo.width-cropWidth)/2
+            android.graphics.Rect(left,0,left+cropWidth,photo.height)
+        } else {
+            val cropHeight=(photo.width/targetRatio).toInt().coerceAtLeast(1)
+            val top=(photo.height-cropHeight)/2
+            android.graphics.Rect(0,top,photo.width,top+cropHeight)
+        }
+    }
     private fun drawPhoto(c:Canvas,p:Paint,photo:Bitmap?,rect:RectF,radius:Float,alpha:Int) {
         if (photo == null || photo.isRecycled) return
         val save=c.save()
         val path=android.graphics.Path().apply { addRoundRect(rect,radius,radius,android.graphics.Path.Direction.CW) }
         c.clipPath(path); p.alpha=alpha
-        c.drawBitmap(photo,null,rect,p)
+        c.drawBitmap(photo,sourceCrop(photo,rect),rect,p)
         p.alpha=255; c.restoreToCount(save)
     }
     private fun drawCirclePhoto(c:Canvas,p:Paint,photo:Bitmap?,rect:RectF,ringColor:Int) {
         if (photo == null || photo.isRecycled) return
-        p.color=ringColor;c.drawOval(rect,p)
-        val inset=rect.width()*.045f
-        val inner=RectF(rect.left+inset,rect.top+inset,rect.right-inset,rect.bottom-inset)
+        val size=minOf(rect.width(),rect.height())
+        val cx=rect.centerX(); val cy=rect.centerY()
+        val square=RectF(cx-size/2,cy-size/2,cx+size/2,cy+size/2)
+        p.color=ringColor;c.drawOval(square,p)
+        val inset=size*.045f
+        val inner=RectF(square.left+inset,square.top+inset,square.right-inset,square.bottom-inset)
         val save=c.save()
         val path=android.graphics.Path().apply { addOval(inner,android.graphics.Path.Direction.CW) }
-        c.clipPath(path); c.drawBitmap(photo,null,inner,p); c.restoreToCount(save)
+        c.clipPath(path); c.drawBitmap(photo,sourceCrop(photo,inner),inner,p); c.restoreToCount(save)
     }
     private fun title(c:Canvas,p:Paint,text:String,w:Int,h:Int,color:Int) {
         p.color=color;p.textSize=w*.064f;p.typeface=android.graphics.Typeface.create("sans-serif-condensed",android.graphics.Typeface.BOLD)
