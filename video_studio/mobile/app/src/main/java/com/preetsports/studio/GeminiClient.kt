@@ -49,7 +49,7 @@ class GeminiClient(private val apiKey: String) {
         error(lastError)
     }
 
-    suspend fun createScript(match: String, format: String, minutes: Int): String = withContext(Dispatchers.IO) {
+    suspend fun createScript(match: String, format: String, minutes: Int, researchContext: String = ""): String = withContext(Dispatchers.IO) {
         require(apiKey.isNotBlank()) { "Add your Gemini API key in Settings first." }
         val prompt = """
             You are the Roman Hinglish cricket presenter for Preet Sports.
@@ -58,7 +58,10 @@ class GeminiClient(private val apiKey: String) {
             strong opening hook, smooth transitions, tactical analysis, key player roles, pitch and head-to-head
             only when facts are supplied, and a balanced prediction section. Do not invent current squads,
             injuries, statistics, pitch conditions, venue facts or head-to-head records. If facts are unknown,
-            clearly say they are not verified and focus on conditional tactical analysis. Output only the script.
+            clearly say they are not verified and focus on conditional tactical analysis.
+            Use the following imported match research as source material. Do not treat navigation labels or page metadata as verified facts.
+            $researchContext
+            Output only the script.
         """.trimIndent()
         val contents = JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", prompt))))
         val response = post("gemini-3.8-flash", JSONObject().put("contents", contents))
