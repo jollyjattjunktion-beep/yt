@@ -135,7 +135,14 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                                         LocalProjectStore(context).saveScript(project, match, format, script)
                                         notice = "Script ready. Generating presenter voice…"
                                         val audio = gemini.createVoice(script, java.io.File(project, "voiceover.wav"))
-                                        notice = "Script and voice generated on this phone.\nSaved in: ${project.absolutePath}\nAudio: ${audio.name}\nNext stage: native video rendering."
+                                        val scenes = CricketSceneRenderer().defaultScenes(match, format)
+                                        scenes.forEachIndexed { index, scene ->
+                                            CricketSceneRenderer().savePreview(scene, java.io.File(project, "scene-${index + 1}.jpg"))
+                                        }
+                                        val job = StudioJob(project.name, match, format, minutes, "assets_ready", 65,
+                                            "Script, narration and scene graphics generated", project.absolutePath)
+                                        StudioJobStore(context).save(job)
+                                        notice = "On-device assets generated.\\nProject: ${project.absolutePath}\\nScript: script.txt\\nVoice: ${audio.name}\\nGraphics: ${scenes.size} scene cards\\nMP4 video encoding is the next integration stage."
                                     } catch (e: Exception) {
                                         notice = "Production step failed: ${e.message ?: "Unknown error"}"
                                     } finally { busy = false }
