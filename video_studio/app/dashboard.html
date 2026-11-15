@@ -1,49 +1,28 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Preet Sports AI Video Studio</title>
+<title>Preet Sports AI Cricket Production Studio</title>
 <style>
-:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#091827;color:#f4f7fb;font:16px system-ui}main{max-width:760px;margin:36px auto;padding:22px}.panel{background:#12263a;border:1px solid #28435c;border-radius:18px;padding:22px;margin:14px 0}h1{margin:0;color:#f0c16b}p,small{color:#aebdca}label{display:block;margin:14px 0 6px}input,select,textarea{width:100%;padding:12px;border-radius:9px;border:1px solid #3c566d;background:#091827;color:white}button{margin-top:18px;padding:13px 18px;border:0;border-radius:10px;background:#e6b75f;color:#172334;font-weight:700;width:100%}.status{padding:12px;background:#091827;border-radius:10px;white-space:pre-wrap}.links a{display:inline-block;color:#f0c16b;margin:8px 12px 0 0}#job{display:none}.mark{font-size:12px;letter-spacing:3px;color:#e6b75f}
-</style></head><body><main><div class="mark">PREET SPORTS</div><h1>AI Video Studio</h1><p>One match name → Hinglish narration → dual-format cricket preview.</p>
-<div class="panel"><form id="form"><label>Match name</label><input id="match" required placeholder="India vs Australia 1st ODI">
-<label>Format</label><select id="format"><option>ODI</option><option>T20</option><option>Test</option><option>Other</option></select>
-<label>Duration</label><select id="duration"><option value="5">5 minutes</option><option value="6" selected>6 minutes</option><option value="7">7 minutes</option></select>
-<label>Verified match facts (optional JSON)</label><textarea id="facts" rows="5" placeholder='{"venue":"...","confirmed_xi":[]} — only include sourced facts'></textarea>
-<label>Voice</label><input id="voice" value="en-IN-PrabhatNeural">
-<label><input id="publish" type="checkbox" style="width:auto"> Upload both finished videos to my YouTube channel (requires OAuth setup)</label>
-<label>Upload privacy</label><select id="privacy"><option value="private">Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option></select>
-<button type="submit">Generate both videos</button></form></div>
-<div class="panel" id="job"><h3>Production status</h3><div class="status" id="status">Starting…</div><div class="links" id="links"></div></div>
-<p><small>Configure Gemini and a trusted cricket-data adapter for researched match facts. Without these, the system deliberately avoids inventing stats, squads and pitch reports. Uploading to YouTube requires your OAuth client and consent.</small></p>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#081522;color:#f4f7fb;font:15px system-ui}main{max-width:900px;margin:28px auto;padding:18px}.mark{font-size:12px;letter-spacing:3px;color:#e6b75f}h1{margin:4px 0;color:#f0c16b;font-size:30px}h2{font-size:19px}.muted,small{color:#aebdca}.panel{background:#12263a;border:1px solid #28435c;border-radius:16px;padding:20px;margin:14px 0}label{display:block;margin:13px 0 6px}input,select,textarea{width:100%;padding:12px;border-radius:9px;border:1px solid #3c566d;background:#091827;color:white}button{margin-top:16px;padding:13px 18px;border:0;border-radius:10px;background:#e6b75f;color:#172334;font-weight:700;width:100%;cursor:pointer}.secondary{background:#29445c;color:#fff}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.status{padding:12px;background:#091827;border-radius:10px;white-space:pre-wrap}.links a{display:inline-block;color:#f0c16b;margin:8px 12px 0 0}.hide{display:none}.tag{display:inline-block;border:1px solid #446079;border-radius:20px;padding:5px 10px;margin:4px;color:#d6e0e9;font-size:12px}@media(max-width:650px){.grid{grid-template-columns:1fr}main{padding:12px}}
+</style></head><body><main><div class="mark">PREET SPORTS · LOCAL EDITION</div><h1>AI Cricket Production Studio</h1><p class="muted">Match research → Roman Hinglish script → Gemini presenter voice → cricket graphics → dual-format video.</p>
+<div class="panel"><h2>1. Gemini & data settings</h2><p class="muted">Add your Gemini API key here. It is saved only in this local installation's .env file and is not displayed again.</p>
+<label>Gemini API key</label><input id="geminiKey" type="password" placeholder="Paste your Gemini API key">
+<div class="grid"><div><label>Script model</label><input id="geminiModel" value="gemini-2.5-flash"></div><div><label>Gemini TTS model</label><input id="ttsModel" value="gemini-3.8-flash-lite-tts"></div></div>
+<div class="grid"><div><label>TTS voice</label><select id="ttsVoice"><option>Charon</option><option>Fenrir</option><option>Orus</option><option>Kore</option><option>Puck</option></select></div><div><label>Cricket data adapter URL (optional for now)</label><input id="dataUrl" placeholder="Your permitted cricket data API endpoint"></div></div>
+<label>Cricket data API key (optional)</label><input id="dataKey" type="password" placeholder="Optional provider key">
+<button id="saveSettings">Save API settings</button><div id="settingsStatus" class="status" style="margin-top:12px">Checking local settings…</div></div>
+<div class="panel"><h2>2. Create cricket video</h2><label>Match name</label><input id="match" placeholder="India vs Australia 1st ODI">
+<div class="grid"><div><label>Format</label><select id="format"><option>ODI</option><option>T20</option><option>Test</option><option>Other</option></select></div><div><label>Video duration</label><select id="duration"><option value="5">5 minutes</option><option value="6" selected>6 minutes</option><option value="7">7 minutes</option></select></div></div>
+<label>Verified match facts (optional JSON)</label><textarea id="facts" rows="4" placeholder='{"venue":"...","confirmed_xi":[]} Only include facts from trusted sources.'></textarea>
+<button id="generate">Generate cricket production</button></div>
+<div class="panel hide" id="job"><h2>Production progress</h2><div id="status" class="status">Queued…</div><div id="links" class="links"></div></div>
+<div class="panel"><h2>Production modules</h2><span class="tag">Roman Hinglish script</span><span class="tag">Gemini TTS</span><span class="tag">Stadium-style opening</span><span class="tag">Team introductions</span><span class="tag">Player cards</span><span class="tag">Pitch report</span><span class="tag">Head-to-head</span><span class="tag">Match prediction</span><span class="tag">16:9 + 9:16</span><p class="muted">Research-backed player, pitch and head-to-head details require a configured cricket data provider. If information is missing, the studio must show that it is unavailable rather than inventing it.</p></div>
 <script>
-const form=document.querySelector('#form'), job=document.querySelector('#job'), status=document.querySelector('#status'), links=document.querySelector('#links');
-form.addEventListener('submit',async e=>{e.preventDefault();links.innerHTML='';job.style.display='block';status.textContent='Submitting…';
-let facts={};try{facts=JSON.parse(document.querySelector('#facts').value||'{}')}catch{status.textContent='Match facts must be valid JSON.';return}
-const payload={match_name:document.querySelector('#match').value,format:document.querySelector('#format').value,duration_minutes:+document.querySelector('#duration').value,language:'Roman Hinglish',voice:document.querySelector('#voice').value,match_facts:facts,publish_to_youtube:document.querySelector('#publish').checked,privacy_status:document.querySelector('#privacy').value};
-try{const res=await fetch('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),cache:'no-store'});const raw=await res.text();let data=null;try{data=raw?JSON.parse(raw):null}catch{}if(!res.ok)throw new Error('HTTP '+res.status+': '+(raw||'empty server response'));if(!data||!data.job_id)throw new Error('Server returned empty/invalid JSON or no job ID. '+(raw||'No response body.'));poll(data.job_id)}catch(err){status.textContent='Submission error: '+err.message}});
-let pollTimer=null, pollFailures=0;
-async function poll(id){
- clearTimeout(pollTimer);
- try{
-  const r=await fetch('/api/jobs/'+encodeURIComponent(id),{cache:'no-store'});
-  const raw=await r.text();
-  let j=null;try{j=raw?JSON.parse(raw):null}catch{}
-  if(!r.ok){
-   if(r.status===404){status.textContent='Job '+id+' was not found. The server may have restarted and lost its in-memory job record. Check server health before submitting again.';return}
-   throw new Error('HTTP '+r.status+': '+(raw||'empty server response'));
-  }
-  if(!j)throw new Error('Empty or invalid JSON response from server.');
-  pollFailures=0;
-  status.textContent='Job '+id+'\\nStatus: '+j.status+(j.error?'\\nError: '+j.error:'');
-  if(j.status==='completed'){
-   links.innerHTML=['landscape','portrait','audio','script','metadata'].map(k=>'<a href="/api/jobs/'+id+'/files/'+k+'" download>'+k+'</a>').join('');return;
-  }
-  if(j.status==='failed')return;
-  pollTimer=setTimeout(()=>poll(id),3000);
- }catch(e){
-  pollFailures++;
-  status.textContent='Job '+id+'\\nStatus check failed ('+pollFailures+'): '+e.message+'\\nRetrying automatically…';
-  if(pollFailures<=10)pollTimer=setTimeout(()=>poll(id),Math.min(15000,3000*pollFailures));
-  else status.textContent+='\\nAutomatic retries paused. Refresh the page or check Render service health.';
- }
-}
+const $=id=>document.getElementById(id);
+async function loadSettings(){try{const r=await fetch('/api/settings');const s=await r.json();$('geminiModel').value=s.gemini_model;$('ttsModel').value=s.gemini_tts_model;$('ttsVoice').value=s.gemini_tts_voice;$('dataUrl').value=s.cricket_data_api_url||'';$('settingsStatus').textContent=s.gemini_api_key_set?'Gemini API key is saved ('+s.gemini_api_key_masked+').':'Gemini API key not configured yet.'}catch(e){$('settingsStatus').textContent='Could not load settings: '+e.message}}
+$('saveSettings').onclick=async()=>{const body={gemini_api_key:$('geminiKey').value,gemini_model:$('geminiModel').value,gemini_tts_model:$('ttsModel').value,gemini_tts_voice:$('ttsVoice').value,cricket_data_api_url:$('dataUrl').value,cricket_data_api_key:$('dataKey').value};try{const r=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw Error(d.detail||r.status);$('geminiKey').value='';$('dataKey').value='';$('settingsStatus').textContent='Settings saved. Gemini key configured: '+d.gemini_api_key_set+'.'}catch(e){$('settingsStatus').textContent='Save failed: '+e.message}};
+$('generate').onclick=async()=>{let facts={};try{facts=JSON.parse($('facts').value||'{}')}catch{$('status').textContent='Match facts must be valid JSON.';return}if(!$('match').value.trim()){$('status').textContent='Enter a match name.';return}
+$('job').classList.remove('hide');$('links').innerHTML='';$('status').textContent='Submitting job…';
+try{const r=await fetch('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({match_name:$('match').value,format:$('format').value,duration_minutes:+$('duration').value,language:'Roman Hinglish',match_facts:facts})});const d=await r.json();if(!r.ok)throw Error(d.detail||r.status);poll(d.job_id)}catch(e){$('status').textContent='Could not submit: '+e.message}};
+async function poll(id){try{const r=await fetch('/api/jobs/'+id);const j=await r.json();if(!r.ok)throw Error(j.detail||r.status);$('status').textContent='Job '+id+'\n'+j.status.toUpperCase()+' · '+j.progress+'%\n'+j.stage+(j.error?'\n'+j.error:'');if(j.status==='completed'){$('links').innerHTML=['landscape','portrait','audio','script','metadata'].map(k=>'<a href="/api/jobs/'+id+'/files/'+k+'" download>'+k+'</a>').join('');return}if(j.status==='failed')return;setTimeout(()=>poll(id),2500)}catch(e){$('status').textContent='Status error: '+e.message+' — retrying…';setTimeout(()=>poll(id),5000)}}
+loadSettings();
 </script></main></body></html>
