@@ -1,5 +1,6 @@
 package com.preetsports.studio
 
+import android.util.Base64
 import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.ReturnCode
 import kotlinx.coroutines.Dispatchers
@@ -102,16 +103,19 @@ class ApinexClient(
             .post(payload.toString().toRequestBody("application/json".toMediaType()))
             .build()
         http.newCall(req).execute().use { response ->
+            val raw = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
-                val detail = response.body?.string().orEmpty().take(450)
+                val detail = raw.take(450)
                 error(when (response.code) {
                     401, 403 -> "APInex rejected the voice API key (${response.code})."
                     429 -> "APInex voice rate limit reached (429). Wait and retry."
                     else -> "APInex voice request failed (${response.code}): $detail"
                 })
             }
-            val bytes = response.body?.bytes() ?: ByteArray(0)
-            require(bytes.isNotEmpty()) { "APInex returned an empty voice audio response." }
+            val audio = JSONObject(raw).optString("audio_base64")
+            require(audio.isNotBlank()) { "APInex TTS response did not contain audio_base64." }
+            val bytes = Base64.decode(audio, Base64.DEFAULT)
+            require(bytes.isNotEmpty()) { "APInex returned an empty decoded audio segment." }
             return bytes
         }
     }
@@ -128,10 +132,9 @@ class ApinexClient(
                 chunks.forEachIndexed { index, chunk ->
                     onProgress("APInex presenter voice: segment ${index + 1}/${chunks.size} · model $ttsModel…")
                     val payload = JSONObject()
-                        .put("input", "Read this Roman Hinglish cricket presenter script verbatim. Warm, energetic sports presenter delivery. Do not translate or paraphrase. $chunk")
+                        .put("text", "Read this Roman Hinglish cricket presenter script verbatim. Warm, energetic sports presenter delivery. Do not translate or paraphrase. $chunk")
                         .put("model", ttsModel)
-                        .put("response_format", "mp3")
-                    if (ttsVoice.isNotBlank()) payload.put("voice", ttsVoice)
+                        .put("encoding", "mp3")
                     val bytes = postAudio("https://api.apinex.bond/v1/tools/voice/tts", voiceApiKey, payload)
                     require(bytes.size > 100) { "APInex returned an unexpectedly small audio segment ${index + 1}." }
                     stream.write(bytes)
