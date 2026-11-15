@@ -99,13 +99,13 @@ class MatchUrlImporter {
             host == "cricbuzz.com" || host.endsWith(".cricbuzz.com") ||
             host == "espncricinfo.com" || host.endsWith(".espncricinfo.com") ||
             host == "howstat.com" || host.endsWith(".howstat.com"))) {
-            "Only official ICC and Cricbuzz HTTPS URLs are accepted."
+            "Only approved trusted HTTPS cricket-source domains are accepted."
         }
         val request = Request.Builder().url(uri.toASCIIString())
             .header("User-Agent", "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36")
             .header("Accept-Language", "en-US,en;q=0.9")
             .get().build()
-        client.newCall(request).execute().use { response ->
+        return client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) error("$source returned HTTP ${response.code}")
             val html = response.body?.string().orEmpty()
             require(html.isNotBlank()) { "$source returned an empty page." }
