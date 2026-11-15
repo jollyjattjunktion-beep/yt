@@ -49,11 +49,9 @@ class MainActivity : ComponentActivity() {
             )) {
                 StudioHome(
                     scriptKey = safePrefs.getString("apinex_script_key", "") ?: "",
-                    voiceKey = safePrefs.getString("apinex_voice_key", "") ?: "",
-                    voiceModel = safePrefs.getString("apinex_voice_model", "aura-2-thalia-en") ?: "aura-2-thalia-en",
+                    geminiVoiceKey = safePrefs.getString("gemini_voice_key", "") ?: "",
                     onSaveScriptKey = { safePrefs.edit().putString("apinex_script_key", it.trim()).apply() },
-                    onSaveVoiceKey = { safePrefs.edit().putString("apinex_voice_key", it.trim()).apply() },
-                    onSaveVoiceModel = { safePrefs.edit().putString("apinex_voice_model", it.trim()).apply() },
+                    onSaveGeminiVoiceKey = { safePrefs.edit().putString("gemini_voice_key", it.trim()).apply() },
 
                 )
             }
@@ -63,9 +61,8 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun StudioHome(
-    scriptKey: String, voiceKey: String, voiceModel: String,
-    onSaveScriptKey: (String) -> Unit, onSaveVoiceKey: (String) -> Unit,
-    onSaveVoiceModel: (String) -> Unit
+    scriptKey: String, geminiVoiceKey: String,
+    onSaveScriptKey: (String) -> Unit, onSaveGeminiVoiceKey: (String) -> Unit
 ) {
     var match by remember { mutableStateOf("") }
     var iccUrl by remember { mutableStateOf("https://www.icc-cricket.com/tournaments/icc-women-s-emerging-nations-trophy-2026/matches/275635/zimbabwe-vs-pakistan") }
@@ -86,13 +83,11 @@ private fun StudioHome(
     var format by remember { mutableStateOf("T20") }
     var duration by remember { mutableStateOf("5 minutes") }
     var scriptApiKey by remember { mutableStateOf("") }
-    var voiceApiKey by remember { mutableStateOf("") }
+    var geminiVoiceApiKey by remember { mutableStateOf("") }
     var activeScriptKey by remember { mutableStateOf(scriptKey) }
-    var activeVoiceKey by remember { mutableStateOf(voiceKey) }
+    var activeGeminiVoiceKey by remember { mutableStateOf(geminiVoiceKey) }
     var scriptKeySaved by remember { mutableStateOf(scriptKey.isNotBlank()) }
-    var voiceKeySaved by remember { mutableStateOf(voiceKey.isNotBlank()) }
-    var ttsModelInput by remember { mutableStateOf("") }
-    var activeTtsModel by remember { mutableStateOf(voiceModel) }
+    var geminiVoiceKeySaved by remember { mutableStateOf(geminiVoiceKey.isNotBlank()) }
     var notice by remember { mutableStateOf("Ready to configure your production studio.") }
     var busy by remember { mutableStateOf(false) }
     var photoUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
@@ -222,36 +217,21 @@ private fun StudioHome(
                 )
                 Text(if (scriptKeySaved) "✓ Script key saved securely." else "Required for Roman Hinglish script generation.", color = if (scriptKeySaved) Gold else Color.LightGray)
                 OutlinedTextField(
-                    value = voiceApiKey,
+                    value = geminiVoiceApiKey,
                     onValueChange = { entered ->
-                        voiceApiKey = entered
+                        geminiVoiceApiKey = entered
                         if (entered.isNotBlank()) {
-                            onSaveVoiceKey(entered)
-                            activeVoiceKey = entered.trim()
-                            voiceKeySaved = true
-                            notice = "APInex presenter voice key securely saved on this device."
+                            onSaveGeminiVoiceKey(entered)
+                            activeGeminiVoiceKey = entered.trim()
+                            geminiVoiceKeySaved = true
+                            notice = "Gemini presenter voice key securely saved on this device."
                         }
                     },
-                    label = { Text("APInex Presenter Voice API key") },
+                    label = { Text("Gemini Presenter Voice API key") },
                     modifier = Modifier.fillMaxWidth(), singleLine = true
                 )
-                Text(if (voiceKeySaved) "✓ Presenter voice key saved securely." else "Required for APInex text-to-speech.", color = if (voiceKeySaved) Gold else Color.LightGray)
-                OutlinedTextField(
-                    value = ttsModelInput,
-                    onValueChange = { entered ->
-                        ttsModelInput = entered
-                        if (entered.isNotBlank()) {
-                            activeTtsModel = entered.trim()
-                            onSaveVoiceModel(entered)
-                            notice = "APInex TTS model saved."
-                        }
-                    },
-                    label = { Text("Presenter voice model ID") },
-                    placeholder = { Text("aura-2-thalia-en") },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true
-                )
-                Text("Current TTS model: $activeTtsModel", color = Gold, style = MaterialTheme.typography.bodySmall)
-                Text("Choose a supported APInex TTS model ID. APInex currently documents Aura-2 voices; the model ID selects the voice. Voice is converted locally to WAV.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+                Text(if (geminiVoiceKeySaved) "✓ Gemini voice key saved securely." else "Required for Gemini presenter TTS. Use your Google AI Studio API key.", color = if (geminiVoiceKeySaved) Gold else Color.LightGray)
+                Text("Presenter voice: Gemini 3.8 Flash-Lite TTS · Charon. APInex remains selected for script generation.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
             }
         }
         Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
@@ -355,14 +335,14 @@ private fun StudioHome(
                                             }
                                         }
                                         val minutes = duration.substringBefore(" ").toIntOrNull() ?: 5
-                                        val selectedTtsModel = ttsModelInput.trim().ifBlank { activeTtsModel }
-                                        val apinex = ApinexClient(textKey, speechKey, ttsModel = selectedTtsModel)
+                                        val apinex = ApinexClient(textKey, textKey)
                                         val script = scriptText.ifBlank { apinex.createScript(match, format, minutes, report.toPromptContext()) }.also { scriptText = it }
                                         LocalProjectStore(context).saveScript(project, match, format, script)
-                                        notice = "STAGE 1/3 COMPLETE — research and script saved. STAGE 2/3 — generating APInex presenter voice…"
-                                        val audio = apinex.createVoice(script, java.io.File(project, "voiceover.wav")) { progress ->
-                                            notice = progress
-                                        }
+                                        notice = "STAGE 1/3 COMPLETE — research and script saved. STAGE 2/3 — generating Gemini presenter voice…"
+                                        val audio = GeminiClient(activeGeminiVoiceKey).createVoice(
+                                            script, java.io.File(project, "voiceover.wav"),
+                                            model = "gemini-3.8-flash-lite-tts", voice = "Charon"
+                                        ) { progress -> notice = progress }
                                         val scenes = CricketSceneRenderer().defaultScenes(match, format)
                                         val photoAssets = ScenePhotoAssets.load(project)
                                         try {
