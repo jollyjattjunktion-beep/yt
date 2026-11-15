@@ -61,6 +61,10 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
     var iccUrl by remember { mutableStateOf("https://www.icc-cricket.com/tournaments/icc-women-s-emerging-nations-trophy-2026/matches/275635/zimbabwe-vs-pakistan") }
     var cricbuzzUrl by remember { mutableStateOf("https://www.cricbuzz.com/live-cricket-scores/177481/zimw-vs-pakw-14th-match-group-b-icc-womens-emerging-nations-trophy-2026") }
     var importedResearch by remember { mutableStateOf<MatchResearch?>(null) }
+    var researchReport by remember { mutableStateOf<MatchResearchReport?>(null) }
+    var stageOneDone by remember { mutableStateOf(false) }
+    var stageTwoDone by remember { mutableStateOf(false) }
+    var stageThreeDone by remember { mutableStateOf(false) }
     var format by remember { mutableStateOf("T20") }
     var duration by remember { mutableStateOf("5 minutes") }
     var apiKey by remember { mutableStateOf("") }
@@ -115,7 +119,7 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
         }
         Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("02 · Import match from URLs", color = Gold, fontWeight = FontWeight.Bold)
+                Text("02 · Stage 1 — Match research", color = Gold, fontWeight = FontWeight.Bold)
                 Text("Paste official ICC and Cricbuzz match links. The app fetches available page details and related squad/scorecard links.", color = Color.LightGray)
                 OutlinedTextField(value = iccUrl, onValueChange = { iccUrl = it; importedResearch = null }, label = { Text("ICC match URL") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
                 OutlinedTextField(value = cricbuzzUrl, onValueChange = { cricbuzzUrl = it; importedResearch = null }, label = { Text("Cricbuzz match URL") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
@@ -126,10 +130,16 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                         notice = "Fetching match details from ICC and Cricbuzz…"
                         scope.launch {
                             try {
-                                val research = MatchUrlImporter().import(iccUrl, cricbuzzUrl)
-                                importedResearch = research
+                                val research = MatchResearchEngine().research(iccUrl, cricbuzzUrl)
+                                researchReport = research
+                                val raw = MatchUrlImporter().import(iccUrl, cricbuzzUrl)
+                                importedResearch = raw
                                 if (match.isBlank()) match = research.matchTitle
-                                notice = "Match sources imported. Review the extracted details below."
+                                val project = LocalProjectStore(context).createProject(match)
+                                research.save(java.io.File(project, "research-report.json"))
+                                java.io.File(project, "match-research.txt").writeText(research.toPromptContext())
+                                java.io.File(project, "research-project-path.txt").writeText(project.absolutePath)
+                                notice = "Stage 1 research completed. Review verified facts, conflicts and missing information before production."
                             } catch (e: Exception) {
                                 notice = "Match import failed: ${e.message ?: "Unknown error"}"
                             } finally { busy = false }
@@ -137,20 +147,15 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) { Text(if (busy) "Fetching sources…" else "Fetch match data") }
-                importedResearch?.let { research ->
-                    Text("MATCH: ${research.matchTitle}", color = Color.White, fontWeight = FontWeight.Bold)
-                    Text("VENUE: ${research.venue ?: "Not verified"}", color = Color.LightGray)
-                    Text("DATE: ${research.dateTime ?: "Not verified"}", color = Color.LightGray)
-                    Text("SQUADS: ${research.squadUrl ?: "Link not found"}", color = Color.LightGray)
-                    Text("SCORECARD: ${research.scorecardUrl ?: "Link not found"}", color = Color.LightGray)
-                    val imageCount = research.pages.sumOf { it.imageLinks.size }
-                    Text("SOURCE IMAGES DISCOVERED: $imageCount", color = Gold)
-                    research.pages.forEach { page ->
-                        Text("${page.source}: ${page.imageLinks.size} image links · ${page.relatedLinks.size} related links", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+                researchReport?.let { report ->
+                    Text("MATCH: ${report.matchTitle}", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("STAGE 1: ${report.facts.size} source-backed facts · ${report.sourceUrls.size} source pages · ${report.imageCandidates.size} image candidates", color = Gold)
+                    report.facts.forEach { fact ->
+                        Text("${fact.field}: ${fact.value} · ${fact.confidence}", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
                     }
-                    Text("Image URLs are collected with their source page. Before publishing, use images whose reuse rights are confirmed.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
-                    research.warnings.forEach { Text("• $it", color = Gold, style = MaterialTheme.typography.bodySmall) }
-                    Text("Imported source text is retained in this project and passed to script generation.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+                    report.conflicts.forEach { Text("CONFLICT: $it", color = Gold, style = MaterialTheme.typography.bodySmall) }
+                    report.missing.forEach { Text("NOT VERIFIED: $it", color = Color.LightGray, style = MaterialTheme.typography.bodySmall) }
+                    Text("Player image candidates are not assigned to players until identity is verified. Source URLs are retained.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -179,6 +184,8 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
         }
         Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("03 · Stages 2 and 3 — Video & YouTube package", color = Gold, fontWeight = FontWeight.Bold)
+                Text("Stage 1: research + script  ·  Stage 2: voice + 16:9/9:16 MP4  ·  Stage 3: thumbnails + metadata + ZIP package", color = Color.LightGray)
                 Text("05 · Production modules", color = Gold, fontWeight = FontWeight.Bold)
                 listOf("Roman Hinglish commentary", "Gemini presenter voice", "Stadium and team graphics", "Player cards and pitch report", "Head-to-head and match analysis", "9:16 and 16:9 video exports").forEach {
                     Text("✓  $it", color = Color.White)
@@ -188,14 +195,21 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                     onClick = {
                         when {
                             match.isBlank() -> notice = "Enter a match name to start."
+                            iccUrl.isBlank() && cricbuzzUrl.isBlank() -> notice = "Add at least one ICC or Cricbuzz URL before starting research."
                             !keySaved && apiKey.isBlank() -> notice = "Save your Gemini API key first."
                             else -> {
                                 busy = true
-                                notice = "Preparing your Roman Hinglish script…"
+                                notice = "STAGE 1/3 — Researching both match sources…"
                                 scope.launch {
                                     try {
                                         val key = if (apiKey.isNotBlank()) apiKey.trim() else activeKey
                                         val project = LocalProjectStore(context).createProject(match)
+                                        val report = researchReport ?: MatchResearchEngine().research(iccUrl, cricbuzzUrl).also {
+                                            researchReport = it
+                                            it.save(java.io.File(project, "research-report.json"))
+                                            java.io.File(project, "match-research.txt").writeText(it.toPromptContext())
+                                        }
+                                        stageOneDone = true
                                         if (photoUris.isNotEmpty()) {
                                             val assetDir = java.io.File(project, "assets").apply { mkdirs() }
                                             photoUris.take(14).forEachIndexed { index, uri ->
@@ -216,9 +230,9 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                                         if (research != null) {
                                             java.io.File(project, "match-research.txt").writeText(research.toPromptContext())
                                         }
-                                        val script = gemini.createScript(match, format, minutes, research?.toPromptContext().orEmpty())
+                                        val script = gemini.createScript(match, format, minutes, report.toPromptContext())
                                         LocalProjectStore(context).saveScript(project, match, format, script)
-                                        notice = "Script ready. Generating presenter voice…"
+                                        notice = "STAGE 1/3 COMPLETE — research and full script saved. STAGE 2/3 — generating presenter voice…"
                                         val audio = gemini.createVoice(script, java.io.File(project, "voiceover.wav"))
                                         val scenes = CricketSceneRenderer().defaultScenes(match, format)
                                         val photoAssets = ScenePhotoAssets.load(project)
@@ -229,7 +243,7 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                                         } finally {
                                             photoAssets.recycle()
                                         }
-                                        notice = "Assets ready. Rendering landscape MP4 on this phone…"
+                                        notice = "STAGE 2/3 — rendering landscape and portrait MP4 on this phone…"
                                         val renderer = AndroidMp4Renderer(context)
                                         val landscape = renderer.render(project, audio, scenes, false) { p ->
                                             notice = "Rendering landscape video: $p%"
@@ -243,7 +257,14 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                                         val job = StudioJob(project.name, match, format, minutes, "completed", 100,
                                             "Both MP4 formats exported to Movies/Preet Sports", project.absolutePath)
                                         StudioJobStore(context).save(job)
-                                        notice = "Production complete!\\n16:9: ${landscape.file.name}\\n9:16: ${vertical.file.name}\\nBoth videos saved in Movies/Preet Sports.\\nProject: ${project.absolutePath}"
+                                        stageTwoDone = true
+                                        notice = "STAGE 2/3 COMPLETE — both videos exported. STAGE 3/3 — generating thumbnails and YouTube metadata…"
+                                        val packageFiles = YouTubePackageBuilder().build(project, match, format, script, scenes)
+                                        stageThreeDone = true
+                                        val job = StudioJob(project.name, match, format, minutes, "completed", 100,
+                                            "All three stages complete; YouTube package generated", project.absolutePath)
+                                        StudioJobStore(context).save(job)
+                                        notice = "ALL 3 STAGES COMPLETE!\\n16:9 video: ${landscape.file.name}\\n9:16 video: ${vertical.file.name}\\nThumbnail: ${packageFiles.thumbnailLandscape.name}\\nMetadata: ${packageFiles.metadataFile.name}\\nPackage: ${packageFiles.packageZip.name}\\nVideos saved in Movies/Preet Sports.\\nProject: ${project.absolutePath}"
                                     } catch (e: Exception) {
                                         notice = "Production step failed: ${e.message ?: "Unknown error"}"
                                     } finally { busy = false }
@@ -251,10 +272,10 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                             }
                         }
                     }, modifier = Modifier.fillMaxWidth()
-                ) { Text(if (busy) "Generating…" else "Generate script + voice") }
+                ) { Text(if (busy) "Running production stages…" else "Run all 3 production stages") }
             }
         }
         Text(notice, color = Gold)
-        Text("On-device Gemini script & voice · photo-led match graphics · animated 8 fps MP4 export", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+        Text("Stage 1: URL research + script · Stage 2: Gemini voice + on-device MP4 · Stage 3: thumbnail + metadata + ZIP. YouTube upload remains manual; review every fact and image licence before publishing.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
     }
 }
