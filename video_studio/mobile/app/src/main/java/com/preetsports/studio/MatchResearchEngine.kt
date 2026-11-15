@@ -62,23 +62,27 @@ class MatchResearchEngine(private val importer: MatchUrlImporter = MatchUrlImpor
         val missing = mutableListOf<String>()
 
         fun collect(field: String, pattern: Regex) {
+            val noise = Regex("(?i)\\b(featured videos?|videos?|rankings?|teams videos?|more matches|live:|need \\d+ off|watch now|highlights)\\b")
             val found = raw.pages.mapNotNull { page ->
                 pattern.find(page.extractedText)?.let { match ->
-                    val value = match.groupValues.getOrNull(1)?.trim()?.take(180).orEmpty()
-                    if (value.isBlank()) null else Triple(page, value, match.value.take(240))
+                    val value = match.groupValues.getOrNull(1)?.trim()
+                        ?.substringBefore(Regex("(?i)\\b(FEATURED VIDEOS?|VIDEOS?|RANKINGS?|MORE MATCHES|LIVE:)\\b"))
+                        ?.trim(' ', '|', '•', '-', ':')
+                        ?.take(120).orEmpty()
+                    if (value.length < 3 || noise.containsMatchIn(value)) null
+                    else Triple(page, value, match.value.take(180))
                 }
             }
             if (found.isEmpty()) { missing += field; return }
-            val distinct = found.map { it.second }.distinctBy { it.lowercase() }
-            if (distinct.size > 1) conflicts += "$field differs between supplied pages: " + distinct.joinToString(" / ")
+            val distinct = found.map { it.second.lowercase() }.distinct()
+            if (distinct.size > 1) conflicts += "$field differs between supplied pages: " + found.joinToString(" / ") { "\${it.first.source}: \${it.second}" }
             found.forEach { (page, value, evidence) ->
-                facts += EvidenceFact(field, value, page.url, evidence,
-                    if (distinct.size == 1 && found.size >= 2) "HIGH" else if (page.source == "ICC" || page.source == "Cricbuzz") "MEDIUM" else "LOW")
+                val same = distinct.size == 1 && found.size >= 2
+                facts += EvidenceFact(field, value, page.url, evidence, if (same) "HIGH" else "MEDIUM")
             }
         }
-        collect("Venue", Regex("Venue\\s*:?\\s*([^•|]{3,100})", RegexOption.IGNORE_CASE))
-        collect("Match date/time", Regex("(?:Date\\s*&\\s*Time|Start\\s*Time|Match\\s*Date)\\s*:?\\s*([^•|]{3,100})", RegexOption.IGNORE_CASE))
-        collect("Tournament", Regex("(?:Tournament|Series)\\s*:?\\s*([^•|]{3,120})", RegexOption.IGNORE_CASE))
+        collect("Venue", Regex("(?i)\\bVenue\\s*:?\\s*([^•|]{3,120})"))
+        collect("Match date/time", Regex("(?i)(?:Date\\s*&\\s*Time|Start\\s*Time|Match\\s*Date)\\s*:?\\s*([^•|]{3,140})"))
 
         val titleFacts = raw.pages.map { it to it.title }.filter { it.second.isNotBlank() }
         if (titleFacts.isNotEmpty()) {
