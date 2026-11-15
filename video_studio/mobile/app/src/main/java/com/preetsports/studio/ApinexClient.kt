@@ -168,9 +168,9 @@ class ApinexClient(
                         val downloadedBytes = postAudioToFile("https://api.apinex.bond/v1/tools/voice/tts", voiceApiKey, payload, mp3, diagnostic)
                     diagnostic.appendText("Segment ${index + 1}: downloaded $downloadedBytes bytes\n")
                     } else {
-                        onProgress("Reusing downloaded voice segment ${index + 1}/${chunks.size}…")
+                        reportProgress("Reusing downloaded voice segment ${index + 1}/${chunks.size}…")
                     }
-                    onProgress("Converting voice segment ${index + 1}/${chunks.size}…")
+                    reportProgress("Converting voice segment ${index + 1}/${chunks.size}…")
                     tempPcm.delete()
                     val command = listOf(
                         "-y", "-hide_banner", "-loglevel", "error",
@@ -189,7 +189,7 @@ class ApinexClient(
                 }
                 totalPcmBytes += pcm.length()
                 diagnostic.appendText("Segment ${index + 1}: complete; cumulativePcm=$totalPcmBytes\n")
-                onProgress("Voice segment ${index + 1}/${chunks.size} complete.")
+                reportProgress("Voice segment ${index + 1}/${chunks.size} complete.")
             }
             // Build the final WAV sequentially from small on-disk PCM segments.
             require(totalPcmBytes > 1000) { "APInex voice output is unexpectedly small." }
