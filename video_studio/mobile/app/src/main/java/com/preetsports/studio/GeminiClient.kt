@@ -21,13 +21,32 @@ class GeminiClient(private val apiKey: String) {
 
     private fun post(model: String, payload: JSONObject): JSONObject {
         val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent"
-        val request = Request.Builder().url(url).addHeader("x-goog-api-key", apiKey)
-            .post(payload.toString().toRequestBody("application/json".toMediaType())).build()
-        client.newCall(request).execute().use { response ->
-            val body = response.body?.string().orEmpty()
-            if (!response.isSuccessful) error("Gemini request failed (${response.code}): ${body.take(700)}")
-            return JSONObject(body)
+        val retryable = setOf(429, 500, 502, 503, 504)
+        var lastError = "Gemini request failed."
+        for (attempt in 0..3) {
+            val request = Request.Builder().url(url).addHeader("x-goog-api-key", apiKey)
+                .post(payload.toString().toRequestBody("application/json".toMediaType())).build()
+            try {
+                client.newCall(request).execute().use { response ->
+                    val body = response.body?.string().orEmpty()
+                    if (response.isSuccessful) return JSONObject(body)
+                    lastError = when (response.code) {
+                        503 -> "Gemini is temporarily busy (503)."
+                        429 -> "Gemini rate limit reached (429). Check your usage limits."
+                        else -> "Gemini request failed (${response.code}): ${body.take(500)}"
+                    }
+                    if (response.code !in retryable || attempt == 3) {
+                        error(if (response.code == 503) "$lastError Please wait a minute and try again." else lastError)
+                    }
+                }
+            } catch (e: java.io.IOException) {
+                lastError = "Network error contacting Gemini: ${e.message ?: "connection failed"}"
+                if (attempt == 3) error(lastError)
+            }
+            // Retry temporary overload and network failures with bounded backoff.
+            Thread.sleep(1000L shl attempt)
         }
+        error(lastError)
     }
 
     suspend fun createScript(match: String, format: String, minutes: Int): String = withContext(Dispatchers.IO) {
