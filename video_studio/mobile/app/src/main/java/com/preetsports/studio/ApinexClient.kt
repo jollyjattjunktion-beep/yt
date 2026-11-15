@@ -2,9 +2,6 @@ package com.preetsports.studio
 
 import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.ReturnCode
-import com.fasterxml.jackson.core.JsonFactory
-import com.fasterxml.jackson.core.JsonToken
-import com.fasterxml.jackson.core.Base64Variants
 import java.io.RandomAccessFile
 import android.os.Debug
 import kotlinx.coroutines.Dispatchers
@@ -118,27 +115,17 @@ class ApinexClient(
                 })
             }
             val body = response.body ?: error("APInex returned an empty voice response.")
-            var decoded = 0L
-            diagnostic.appendText("Beginning streamed JSON audio decode\n")
-            body.byteStream().use { input ->
-                JsonFactory().createParser(input).use { parser ->
-                    while (parser.nextToken() != null) {
-                        if (parser.currentToken == JsonToken.FIELD_NAME && parser.currentName == "audio_base64") {
-                            require(parser.nextToken() == JsonToken.VALUE_STRING) {
-                                "APInex audio_base64 field was not a string."
-                            }
-                            target.outputStream().use { output ->
-                                decoded = parser.readBinaryValue(Base64Variants.getDefaultVariant(), output).toLong()
-                            }
-                            diagnostic.appendText("Base64 audio decoded: $decoded bytes; heapUsed=${Debug.getNativeHeapAllocatedSize()}\n")
-                            break
-                        }
-                    }
-                }
+            val contentType = response.header("Content-Type").orEmpty()
+            require(contentType.contains("audio", ignoreCase = true) || contentType.contains("octet-stream", ignoreCase = true)) {
+                "APInex raw-audio mode returned unexpected content type: $contentType"
             }
-            require(decoded > 100) { "APInex TTS response did not contain usable audio_base64 data." }
-            diagnostic.appendText("Audio response parse completed\n")
-            return decoded
+            target.outputStream().use { output ->
+                body.byteStream().use { input -> input.copyTo(output, 16 * 1024) }
+            }
+            val bytes = target.length()
+            diagnostic.appendText("Raw audio saved: $bytes bytes; contentType=$contentType\n")
+            require(bytes > 100) { "APInex returned an empty or invalid MP3 audio file." }
+            return bytes
         }
     }
 
@@ -177,7 +164,7 @@ class ApinexClient(
                         val payload = JSONObject()
                             .put("text", "Read this Roman Hinglish cricket presenter script verbatim. Warm, energetic sports presenter delivery. Do not translate or paraphrase. $chunk")
                             .put("model", ttsModel)
-                            .put("encoding", "mp3")
+                            .put("response_format", "audio")
                         val downloadedBytes = postAudioToFile("https://api.apinex.bond/v1/tools/voice/tts", voiceApiKey, payload, mp3, diagnostic)
                     diagnostic.appendText("Segment ${index + 1}: downloaded $downloadedBytes bytes\n")
                     } else {
