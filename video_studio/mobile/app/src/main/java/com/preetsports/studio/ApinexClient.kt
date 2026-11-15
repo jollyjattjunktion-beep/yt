@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit
 class ApinexClient(
     private val scriptApiKey: String,
     private val voiceApiKey: String,
-    private val scriptModel: String = "free/gemini-3.8-flash",
+    private val scriptModel: String = "gemini-3.8-flash",
     private val ttsModel: String = "aura-2-thalia-en",
     private val ttsVoice: String = ""
 ) {
@@ -74,24 +74,44 @@ class ApinexClient(
     suspend fun createScript(match: String, format: String, minutes: Int, researchContext: String = ""): String =
         withContext(Dispatchers.IO) {
             require(scriptApiKey.isNotBlank()) { "Add your APInex Script API key in Settings first." }
+            // Keep only the useful evidence and avoid paying to resend noisy page extracts.
+            val compactResearch = researchContext
+                .lineSequence()
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .filterNot { line ->
+                    val lower = line.lowercase()
+                    lower.contains("navigation") || lower.contains("cookie") ||
+                        lower.contains("advertisement") || lower.contains("subscribe") ||
+                        lower.contains("related articles") || lower.contains("sign in")
+                }
+                .joinToString("\\n")
+                .take(6500)
+            val targetWords = (minutes * 135).coerceIn(450, 900)
             val prompt = """
-                You are the Roman Hinglish cricket presenter for Preet Sports.
-                Write a complete spoken cricket match preview for $match ($format), approximately $minutes minutes,
-                at 130-140 spoken words per minute. Use Roman Hinglish only, natural Indian conversational rhythm,
-                strong opening hook, smooth transitions, tactical analysis, key player roles, pitch and head-to-head
-                only when facts are supplied, and a balanced prediction section. Do not invent current squads,
-                injuries, statistics, pitch conditions, venue facts or head-to-head records. If facts are unknown,
-                clearly say they are not verified and focus on conditional tactical analysis.
-                Use the following imported match research as source material. Do not treat navigation labels or page metadata as verified facts.
-                $researchContext
-                Output only the script.
+                You write match-preview scripts for Preet Sports.
+                Create a spoken cricket preview in Roman Hinglish (Latin letters only), about $targetWords words.
+                Sound like a natural Indian cricket presenter: energetic, clear, conversational; short sentences;
+                easy names and numbers for TTS. No Devanagari, headings, markdown, emojis, or English-only paragraphs.
+                Structure: 1) strong 2-line hook, 2) match/format/venue/time only if verified,
+                3) team strengths and likely tactics, 4) key players/roles only if supplied,
+                5) pitch and H2H only when supported by evidence, 6) balanced match outlook,
+                7) concise Preet Sports sign-off.
+                Accuracy rules: use only facts in the research below; never invent squads, players, injuries,
+                stats, toss, pitch, venue, dates or records. If a detail is missing, omit it or clearly say
+                it has not been confirmed. Do not repeat the same point. No fake live updates or certainty.
+                Match: $match
+                Format: $format
+                Verified research:
+                $compactResearch
+                Return only the finished spoken script.
             """.trimIndent()
             val messages = JSONArray().put(JSONObject().put("role", "user").put("content", prompt))
             val response = postJson(
                 "https://api.apinex.bond/v1/chat/completions",
                 scriptApiKey,
                 JSONObject().put("model", scriptModel).put("messages", messages)
-                    .put("temperature", 0.65).put("max_tokens", 9000)
+                    .put("temperature", 0.45).put("max_tokens", 1600)
             )
             response.getJSONArray("choices").getJSONObject(0).getJSONObject("message")
                 .getString("content").trim().also { require(it.isNotBlank()) { "APInex returned an empty script." } }
