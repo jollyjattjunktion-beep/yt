@@ -243,16 +243,17 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                                             photoAssets.recycle()
                                         }
                                         notice = "STAGE 2/3 — rendering landscape and portrait MP4 on this phone…"
-                                        val renderer = AndroidMp4Renderer(context)
-                                        val landscape = renderer.render(project, audio, scenes, false) { p ->
-                                            notice = "Rendering landscape video: $p%"
+                                        val sceneFiles = scenes.indices.map { java.io.File(project, "scene-${it + 1}.jpg") }
+                                        val renderer = FfmpegMp4Renderer()
+                                        val landscape = renderer.render(project, audio, sceneFiles, false) { message ->
+                                            notice = message
                                         }
-                                        renderer.publishToMovies(landscape.file)
-                                        notice = "Landscape MP4 saved. Rendering vertical 9:16 version…"
-                                        val vertical = renderer.render(project, audio, scenes, true) { p ->
-                                            notice = "Rendering vertical video: $p%"
+                                        AndroidMp4Renderer(context).publishToMovies(landscape.file)
+                                        notice = "Landscape MP4 saved. Rendering vertical 9:16 version with FFmpeg…"
+                                        val vertical = renderer.render(project, audio, sceneFiles, true) { message ->
+                                            notice = message
                                         }
-                                        renderer.publishToMovies(vertical.file)
+                                        AndroidMp4Renderer(context).publishToMovies(vertical.file)
                                         stageTwoDone = true
                                         notice = "STAGE 2/3 COMPLETE — both videos exported. STAGE 3/3 — generating thumbnails and YouTube metadata…"
                                         val packageFiles = YouTubePackageBuilder().build(project, match, format, script, scenes)
