@@ -87,7 +87,7 @@ class AndroidMp4Renderer(private val context: Context) {
         val mime = MediaFormat.MIMETYPE_VIDEO_AVC
         val encoder = MediaCodec.createEncoderByType(mime)
         val format = MediaFormat.createVideoFormat(mime, width, height).apply {
-            setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible)
+            setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar)
             setInteger(MediaFormat.KEY_BIT_RATE, 1_600_000)
             setInteger(MediaFormat.KEY_FRAME_RATE, 2)
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2)
@@ -103,6 +103,7 @@ class AndroidMp4Renderer(private val context: Context) {
             encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
             encoder.start()
             spool.outputStream().buffered().use { out ->
+                var spoolOffset = 0L
                 while (!eos) {
                     val inputIndex = encoder.dequeueInputBuffer(10_000)
                     if (inputIndex >= 0) {
@@ -128,8 +129,9 @@ class AndroidMp4Renderer(private val context: Context) {
                         if (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0 && info.size > 0) {
                             val bytes = ByteArray(info.size)
                             buffer.position(info.offset); buffer.limit(info.offset + info.size); buffer.get(bytes)
-                            val pos = spool.length()
+                            val pos = spoolOffset
                             out.write(bytes)
+                            spoolOffset += bytes.size
                             packets += Packet(info.presentationTimeUs, info.flags, pos, bytes.size)
                         }
                         if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) eos = true
@@ -180,6 +182,7 @@ class AndroidMp4Renderer(private val context: Context) {
             encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
             encoder.start()
             spool.outputStream().buffered().use { out ->
+                var spoolOffset = 0L
                 while (!eos) {
                     val inputIndex = encoder.dequeueInputBuffer(10_000)
                     if (inputIndex >= 0) {
@@ -203,7 +206,8 @@ class AndroidMp4Renderer(private val context: Context) {
                         if (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0 && info.size > 0) {
                             val bytes = ByteArray(info.size)
                             buffer.position(info.offset); buffer.limit(info.offset + info.size); buffer.get(bytes)
-                            val pos = spool.length(); out.write(bytes)
+                            val pos = spoolOffset
+                            out.write(bytes); spoolOffset += bytes.size
                             packets += Packet(info.presentationTimeUs, info.flags, pos, bytes.size)
                         }
                         if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) eos = true
