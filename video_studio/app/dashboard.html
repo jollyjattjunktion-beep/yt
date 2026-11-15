@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Preet Sports AI Video Studio</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#091827;color:#f4f7fb;font:16px system-ui}main{max-width:760px;margin:36px auto;padding:22px}.panel{background:#12263a;border:1px solid #28435c;border-radius:18px;padding:22px;margin:14px 0}h1{margin:0;color:#f0c16b}p,small{color:#aebdca}label{display:block;margin:14px 0 6px}input,select,textarea{width:100%;padding:12px;border-radius:9px;border:1px solid #3c566d;background:#091827;color:white}button{margin-top:18px;padding:13px 18px;border:0;border-radius:10px;background:#e6b75f;color:#172334;font-weight:700;width:100%}.status{padding:12px;background:#091827;border-radius:10px;white-space:pre-wrap}.links a{display:inline-block;color:#f0c16b;margin:8px 12px 0 0}#job{display:none}.mark{font-size:12px;letter-spacing:3px;color:#e6b75f}
+</style></head><body><main><div class="mark">PREET SPORTS</div><h1>AI Video Studio</h1><p>One match name → Hinglish narration → dual-format cricket preview.</p>
+<div class="panel"><form id="form"><label>Match name</label><input id="match" required placeholder="India vs Australia 1st ODI">
+<label>Format</label><select id="format"><option>ODI</option><option>T20</option><option>Test</option><option>Other</option></select>
+<label>Duration</label><select id="duration"><option value="5">5 minutes</option><option value="6" selected>6 minutes</option><option value="7">7 minutes</option></select>
+<label>Verified match facts (optional JSON)</label><textarea id="facts" rows="5" placeholder='{"venue":"...","confirmed_xi":[]} — only include sourced facts'></textarea>
+<label>Voice</label><input id="voice" value="en-IN-PrabhatNeural">
+<button type="submit">Generate both videos</button></form></div>
+<div class="panel" id="job"><h3>Production status</h3><div class="status" id="status">Starting…</div><div class="links" id="links"></div></div>
+<p><small>Configure Gemini and a trusted cricket-data adapter for researched match facts. Without these, the system deliberately avoids inventing stats, squads and pitch reports. Uploading to YouTube requires your OAuth client and consent.</small></p>
+<script>
+const form=document.querySelector('#form'), job=document.querySelector('#job'), status=document.querySelector('#status'), links=document.querySelector('#links');
+form.addEventListener('submit',async e=>{e.preventDefault();links.innerHTML='';job.style.display='block';status.textContent='Submitting…';
+let facts={};try{facts=JSON.parse(document.querySelector('#facts').value||'{}')}catch{status.textContent='Match facts must be valid JSON.';return}
+const payload={match_name:document.querySelector('#match').value,format:document.querySelector('#format').value,duration_minutes:+document.querySelector('#duration').value,language:'Roman Hinglish',voice:document.querySelector('#voice').value,match_facts:facts};
+try{const res=await fetch('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});if(!res.ok)throw new Error(await res.text());const data=await res.json();poll(data.job_id)}catch(err){status.textContent='Error: '+err.message}});
+async function poll(id){try{const r=await fetch('/api/jobs/'+id);const j=await r.json();status.textContent='Job '+id+'\nStatus: '+j.status+(j.error?'\nError: '+j.error:'');if(j.status==='completed'){links.innerHTML=['landscape','portrait','audio','script','metadata'].map(k=>'<a href="/api/jobs/'+id+'/files/'+k+'" download>'+k+'</a>').join('');return}if(j.status==='failed')return;setTimeout(()=>poll(id),3000)}catch(e){status.textContent=e.message}}
+</script></main></body></html>
