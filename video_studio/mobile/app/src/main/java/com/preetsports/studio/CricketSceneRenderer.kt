@@ -22,8 +22,29 @@ data class StudioScene(
 class CricketSceneRenderer {
     fun defaultScenes(match: String, format: String): List<StudioScene> {
         val teams = match.split(Regex("\\s+vs\\s+|\\s+v\\s+", RegexOption.IGNORE_CASE))
-        val a = teams.firstOrNull()?.trim()?.take(20)?.uppercase().orEmpty().ifBlank { "TEAM A" }
-        val b = teams.getOrNull(1)?.trim()?.take(20)?.uppercase().orEmpty().ifBlank { "TEAM B" }
+        fun code(raw: String?): String {
+            val name = raw.orEmpty().substringBefore(",").trim().split(Regex("\\s+")).firstOrNull().orEmpty()
+            return when (name.lowercase()) {
+                "australia", "aus" -> "AUS"
+                "england", "eng" -> "ENG"
+                "india", "ind" -> "IND"
+                "new" -> "NZ"
+                "newzealand", "nz" -> "NZ"
+                "pakistan", "pak" -> "PAK"
+                "south" -> "SA"
+                "southafrica", "sa" -> "SA"
+                "west" -> "WI"
+                "windies", "wi" -> "WI"
+                "sri" -> "SL"
+                "srilanka", "sl" -> "SL"
+                "bangladesh", "ban" -> "BAN"
+                "afghanistan", "afg" -> "AFG"
+                "zimbabwe", "zim" -> "ZIM"
+                else -> name.take(3).uppercase().ifBlank { "TEAM" }
+            }
+        }
+        val a = code(teams.firstOrNull())
+        val b = code(teams.getOrNull(1))
         return listOf(
             StudioScene("MATCH DAY", "$match  •  $format", SceneKind.HERO, a, b),
             StudioScene("THE BIG MATCHUP", "Team comparison and key talking points", SceneKind.MATCHUP, a, b),
@@ -37,7 +58,7 @@ class CricketSceneRenderer {
         )
     }
 
-    fun draw(scene: StudioScene, width: Int, height: Int, frameIndex: Int): Bitmap {
+    fun draw(scene: StudioScene, width: Int, height: Int, frameIndex: Int, assets: ScenePhotoAssets? = null): Bitmap {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val c = Canvas(bitmap)
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -52,9 +73,11 @@ class CricketSceneRenderer {
         c.drawText("PREET SPORTS  /  CRICKET ANALYSIS",width*.075f,height*.09f,p)
         when(scene.kind) {
             SceneKind.HERO -> {
-                p.color=Color.rgb(16,69,73); c.drawOval(RectF(width*.02f,height*.34f,width*.98f,height*.84f),p)
-                p.color=Color.rgb(26,112,76); c.drawOval(RectF(width*.12f,height*.47f,width*.88f,height*.83f),p)
-                p.color=Color.rgb(184,143,83); c.drawRoundRect(RectF(width*.44f,height*.52f,width*.56f,height*.76f),12f,12f,p)
+                if (assets?.venue == null) {
+                    p.color=Color.rgb(16,69,73); c.drawOval(RectF(width*.02f,height*.34f,width*.98f,height*.84f),p)
+                    p.color=Color.rgb(26,112,76); c.drawOval(RectF(width*.12f,height*.47f,width*.88f,height*.83f),p)
+                    p.color=Color.rgb(184,143,83); c.drawRoundRect(RectF(width*.44f,height*.52f,width*.56f,height*.76f),12f,12f,p)
+                }
                 for(n in 0..5) { p.color=gold; c.drawCircle(width*(.12f+n*.15f),height*.30f,width*.009f,p) }
                 title(c,p,scene.title,width,height,gold)
                 badge(c,p,scene.homeTeam,width*.25f,height*.46f,width*.31f,gold)
@@ -82,9 +105,13 @@ class CricketSceneRenderer {
             }
             SceneKind.PITCH -> {
                 title(c,p,scene.title,width,height,gold)
-                p.color=Color.rgb(20,94,73);c.drawRoundRect(RectF(width*.08f,height*.25f,width*.92f,height*.56f),30f,30f,p)
-                p.color=Color.rgb(64,145,91);c.drawOval(RectF(width*.16f,height*.29f,width*.84f,height*.53f),p)
-                p.color=Color.rgb(194,158,101);c.drawRoundRect(RectF(width*.44f,height*.32f,width*.56f,height*.51f),12f,12f,p)
+                if (assets?.venue != null) {
+                    drawPhoto(c,p,assets.venue,RectF(width*.08f,height*.25f,width*.92f,height*.56f),width*.025f,255)
+                } else {
+                    p.color=Color.rgb(20,94,73);c.drawRoundRect(RectF(width*.08f,height*.25f,width*.92f,height*.56f),30f,30f,p)
+                    p.color=Color.rgb(64,145,91);c.drawOval(RectF(width*.16f,height*.29f,width*.84f,height*.53f),p)
+                    p.color=Color.rgb(194,158,101);c.drawRoundRect(RectF(width*.44f,height*.32f,width*.56f,height*.51f),12f,12f,p)
+                }
                 panel(c,p,width*.08f,height*.60f,width*.92f,height*.80f,"PITCH REPORT",listOf("Surface: awaiting verified report","Bounce / carry: confirm at venue","Weather & toss: update on match day"),gold)
                 smallCenter(c,p,"VENUE PHOTO & VERIFIED PITCH DATA SLOT",width,height*.86f)
             }
@@ -130,11 +157,52 @@ class CricketSceneRenderer {
                 p.color=cyan;c.drawRoundRect(RectF(width*.18f,height*.59f,width*.82f,height*.60f),10f,10f,p)
             }
         }
+        assets?.let { photos ->
+            when (scene.kind) {
+                SceneKind.HERO -> {
+                    drawCirclePhoto(c,p,photos.homeTeam,RectF(width*.105f,height*.34f,width*.395f,height*.63f),gold)
+                    drawCirclePhoto(c,p,photos.awayTeam,RectF(width*.605f,height*.34f,width*.895f,height*.63f),cyan)
+                }
+                SceneKind.MATCHUP, SceneKind.PREDICTION -> {
+                    drawCirclePhoto(c,p,photos.homeTeam,RectF(width*.12f,height*.20f,width*.42f,height*.50f),gold)
+                    drawCirclePhoto(c,p,photos.awayTeam,RectF(width*.58f,height*.20f,width*.88f,height*.50f),cyan)
+                }
+                SceneKind.PLAYING_XI -> photos.players.take(11).forEachIndexed { n, photo ->
+                    val x=width*(.08f+(n%3)*.285f); val y=height*(.31f+(n/3)*.125f)
+                    drawPhoto(c,p,photo,RectF(x+width*.012f,y+height*.008f,x+width*.238f,y+height*.068f),width*.014f,255)
+                }
+                SceneKind.PLAYERS -> photos.players.take(3).forEachIndexed { n, photo ->
+                    val x=width*(.08f+n*.29f)
+                    drawCirclePhoto(c,p,photo,RectF(x+width*.045f,height*.33f,x+width*.205f,height*.49f),if(n==1) cyan else gold)
+                }
+                else -> Unit
+            }
+        }
+        val sweep = ((frameIndex % 160) / 160f) * width
+        p.color=Color.argb(145,241,190,86)
+        c.drawRect(sweep,height*.925f,sweep+width*.12f,height*.929f,p)
         p.color=Color.rgb(181,198,211);p.textSize=width*.021f
         c.drawText("GRAPHIC PREVIEW • VERIFY MATCH FACTS BEFORE UPLOAD",width*.075f,height*.955f,p)
         return bitmap
     }
 
+    private fun drawPhoto(c:Canvas,p:Paint,photo:Bitmap?,rect:RectF,radius:Float,alpha:Int) {
+        if (photo == null || photo.isRecycled) return
+        val save=c.save()
+        val path=android.graphics.Path().apply { addRoundRect(rect,radius,radius,android.graphics.Path.Direction.CW) }
+        c.clipPath(path); p.alpha=alpha
+        c.drawBitmap(photo,null,rect,p)
+        p.alpha=255; c.restoreToCount(save)
+    }
+    private fun drawCirclePhoto(c:Canvas,p:Paint,photo:Bitmap?,rect:RectF,ringColor:Int) {
+        if (photo == null || photo.isRecycled) return
+        p.color=ringColor;c.drawOval(rect,p)
+        val inset=rect.width()*.045f
+        val inner=RectF(rect.left+inset,rect.top+inset,rect.right-inset,rect.bottom-inset)
+        val save=c.save()
+        val path=android.graphics.Path().apply { addOval(inner,android.graphics.Path.Direction.CW) }
+        c.clipPath(path); c.drawBitmap(photo,null,inner,p); c.restoreToCount(save)
+    }
     private fun title(c:Canvas,p:Paint,text:String,w:Int,h:Int,color:Int) {
         p.color=color;p.textSize=w*.064f;p.typeface=android.graphics.Typeface.create("sans-serif-condensed",android.graphics.Typeface.BOLD)
         c.drawText(text.take(24),w*.075f,h*.18f,p)
