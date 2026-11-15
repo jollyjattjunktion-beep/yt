@@ -60,6 +60,10 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
     var match by remember { mutableStateOf("") }
     var iccUrl by remember { mutableStateOf("https://www.icc-cricket.com/tournaments/icc-women-s-emerging-nations-trophy-2026/matches/275635/zimbabwe-vs-pakistan") }
     var cricbuzzUrl by remember { mutableStateOf("https://www.cricbuzz.com/live-cricket-scores/177481/zimw-vs-pakw-14th-match-group-b-icc-womens-emerging-nations-trophy-2026") }
+    var pitchSourceUrl by remember { mutableStateOf("") }
+    var h2hSourceUrl by remember { mutableStateOf("") }
+    var playerNames by remember { mutableStateOf("") }
+    var portraitStatus by remember { mutableStateOf("") }
     var importedResearch by remember { mutableStateOf<MatchResearch?>(null) }
     var researchReport by remember { mutableStateOf<MatchResearchReport?>(null) }
     var stageOneDone by remember { mutableStateOf(false) }
@@ -89,7 +93,7 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
     ) {
         Text("PREET SPORTS", color = Gold, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
         Text("AI Cricket Production Studio", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("Paste match links, fetch verified cricket information and create photo-led Roman Hinglish videos on your Android device.", color = Color.LightGray)
+        Text("Research match facts, cross-check trusted sources, match portraits and create Roman Hinglish videos on your Android device.", color = Color.LightGray)
         Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("01 · Match setup", color = Gold, fontWeight = FontWeight.Bold)
@@ -123,7 +127,10 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                 Text("02 · Stage 1 — Match research", color = Gold, fontWeight = FontWeight.Bold)
                 Text("Paste official ICC and Cricbuzz match links. The app fetches available page details and related squad/scorecard links.", color = Color.LightGray)
                 OutlinedTextField(value = iccUrl, onValueChange = { iccUrl = it; importedResearch = null }, label = { Text("ICC match URL") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
-                OutlinedTextField(value = cricbuzzUrl, onValueChange = { cricbuzzUrl = it; importedResearch = null }, label = { Text("Cricbuzz match URL") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+                OutlinedTextField(value = cricbuzzUrl, onValueChange = { cricbuzzUrl = it; importedResearch = null; researchReport = null }, label = { Text("Cricbuzz match URL") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+                OutlinedTextField(value = pitchSourceUrl, onValueChange = { pitchSourceUrl = it; researchReport = null }, label = { Text("Trusted pitch report URL (optional)") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+                OutlinedTextField(value = h2hSourceUrl, onValueChange = { h2hSourceUrl = it; researchReport = null }, label = { Text("Trusted H2H / historical results URL (optional)") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+                OutlinedTextField(value = playerNames, onValueChange = { playerNames = it }, label = { Text("Confirmed player names (comma-separated)") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
                 OutlinedButton(
                     enabled = !busy && (iccUrl.isNotBlank() || cricbuzzUrl.isNotBlank()),
                     onClick = {
@@ -131,7 +138,7 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                         notice = "Fetching match details from ICC and Cricbuzz…"
                         scope.launch {
                             try {
-                                val research = MatchResearchEngine().research(iccUrl, cricbuzzUrl)
+                                val research = MatchResearchEngine().research(iccUrl, cricbuzzUrl, pitchSourceUrl, h2hSourceUrl)
                                 researchReport = research
                                 val raw = MatchUrlImporter().import(iccUrl, cricbuzzUrl)
                                 importedResearch = raw
@@ -158,6 +165,22 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                     report.conflicts.forEach { Text("CONFLICT: $it", color = Gold, style = MaterialTheme.typography.bodySmall) }
                     report.missing.forEach { Text("NOT VERIFIED: $it", color = Color.LightGray, style = MaterialTheme.typography.bodySmall) }
                     Text("Player image candidates are not assigned to players until identity is verified. Source URLs are retained.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+                    Text("Player portrait matching", color = Gold, fontWeight = FontWeight.Bold)
+                    OutlinedButton(enabled = !busy && playerNames.isNotBlank(), onClick = {
+                        busy = true
+                        scope.launch {
+                            try {
+                                val names = playerNames.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                                val project = if (researchProjectPath.isNotBlank()) java.io.File(researchProjectPath)
+                                    else LocalProjectStore(context).createProject(report.matchTitle)
+                                val matches = PortraitMatcher().download(project, names, report.imageCandidates)
+                                portraitStatus = "Downloaded ${matches.size} exact-name portrait(s). Unmatched names were left blank."
+                                notice = portraitStatus
+                            } catch (e: Exception) { notice = "Portrait matching failed: ${e.message}" }
+                            finally { busy = false }
+                        }
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Match and download official portraits") }
+                    if (portraitStatus.isNotBlank()) Text(portraitStatus, color = Gold)
                 }
             }
         }
@@ -207,7 +230,7 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                                         val key = if (apiKey.isNotBlank()) apiKey.trim() else activeKey
                                         val project = if (researchProjectPath.isNotBlank() && java.io.File(researchProjectPath).isDirectory)
                                             java.io.File(researchProjectPath) else LocalProjectStore(context).createProject(match)
-                                        val report = researchReport ?: MatchResearchEngine().research(iccUrl, cricbuzzUrl).also {
+                                        val report = researchReport ?: MatchResearchEngine().research(iccUrl, cricbuzzUrl, pitchSourceUrl, h2hSourceUrl).also {
                                             researchReport = it
                                             it.save(java.io.File(project, "research-report.json"))
                                             java.io.File(project, "match-research.txt").writeText(it.toPromptContext())
