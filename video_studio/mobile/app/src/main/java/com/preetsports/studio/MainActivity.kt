@@ -58,6 +58,7 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
     var duration by remember { mutableStateOf("5 minutes") }
     var apiKey by remember { mutableStateOf("") }
     var keySaved by remember { mutableStateOf(savedKey.isNotBlank()) }
+    var activeKey by remember { mutableStateOf(savedKey) }
     var notice by remember { mutableStateOf("Ready to configure your production studio.") }
     var busy by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -103,7 +104,7 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                 Text("02 · Gemini settings", color = Gold, fontWeight = FontWeight.Bold)
                 OutlinedTextField(value = apiKey, onValueChange = { apiKey = it }, label = { Text("Gemini API key") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                 Button(onClick = {
-                    if (apiKey.isNotBlank()) { onSaveKey(apiKey); apiKey = ""; keySaved = true; notice = "Gemini key saved securely on this device." }
+                    if (apiKey.isNotBlank()) { onSaveKey(apiKey); activeKey = apiKey.trim(); apiKey = ""; keySaved = true; notice = "Gemini key saved securely on this device." }
                     else notice = if (keySaved) "A Gemini key is already saved on this device." else "Enter your Gemini API key first."
                 }, modifier = Modifier.fillMaxWidth()) { Text("Save key securely") }
                 Text(if (keySaved) "API key saved on device" else "API key not configured", color = if (keySaved) Gold else Color.LightGray)
@@ -126,7 +127,7 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                                 notice = "Preparing your Roman Hinglish script…"
                                 scope.launch {
                                     try {
-                                        val key = if (apiKey.isNotBlank()) apiKey.trim() else savedKey
+                                        val key = if (apiKey.isNotBlank()) apiKey.trim() else activeKey
                                         val project = LocalProjectStore(context).createProject(match)
                                         val minutes = duration.substringBefore(" ").toIntOrNull() ?: 5
                                         val gemini = GeminiClient(key)
