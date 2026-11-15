@@ -114,8 +114,14 @@ class MatchUrlImporter {
                 ?.takeIf { it.isNotBlank() } ?: doc.title()
             val description = doc.selectFirst("meta[name=description]")?.attr("content")
                 ?: doc.selectFirst("meta[property=og:description]")?.attr("content").orEmpty()
-            doc.select("script, style, nav, footer, header, noscript").remove()
-            val text = doc.body()?.text().orEmpty().replace(Regex("\\s+"), " ").trim()
+            // Prefer the page's main content. Broad body text includes global menus,
+            // trending headlines and video recommendations which are not match facts.
+            doc.select("script, style, nav, footer, header, noscript, aside, form, [role=navigation], [aria-label*=menu i], .navbar, .navigation, .trending, .recommendations, .video-recommendations, .ad, .advertisement").remove()
+            val main = doc.selectFirst("main, article, [role=main]") ?: doc.body()
+            val text = main?.text().orEmpty()
+                .replace(Regex("\\s+"), " ").trim()
+                .takeIf { it.length >= 120 }
+                ?: doc.body()?.text().orEmpty().replace(Regex("\\s+"), " ").trim()
             val links = linkedMapOf<String, String>()
             doc.select("a[href]").forEach { a ->
                 val label = a.text().trim()
