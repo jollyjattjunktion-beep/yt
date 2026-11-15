@@ -324,14 +324,14 @@ private fun StudioHome(
                             match.isBlank() -> notice = "Enter a match name to start."
                             iccUrl.isBlank() && cricbuzzUrl.isBlank() -> notice = "Add at least one ICC or Cricbuzz URL before starting research."
                             !(scriptKeySaved || scriptApiKey.isNotBlank()) -> notice = "Enter your APInex Script API key first."
-                            !(voiceKeySaved || voiceApiKey.isNotBlank()) -> notice = "Enter your APInex Presenter Voice API key first."
+                            !(geminiVoiceKeySaved || geminiVoiceApiKey.isNotBlank()) -> notice = "Enter your Gemini Presenter Voice API key first."
                             else -> {
                                 busy = true
                                 notice = "STAGE 1/3 — Researching both match sources…"
                                 scope.launch {
                                     try {
                                         val textKey = if (scriptApiKey.isNotBlank()) scriptApiKey.trim() else activeScriptKey
-                                        val speechKey = if (voiceApiKey.isNotBlank()) voiceApiKey.trim() else activeVoiceKey
+                                        val voiceKey = if (geminiVoiceApiKey.isNotBlank()) geminiVoiceApiKey.trim() else activeGeminiVoiceKey
                                         val project = if (researchProjectPath.isNotBlank() && java.io.File(researchProjectPath).isDirectory)
                                             java.io.File(researchProjectPath) else LocalProjectStore(context).createProject(match)
                                         val report = researchReport ?: MatchResearchEngine().research(iccUrl, cricbuzzUrl, pitchSourceUrl, h2hSourceUrl).also {
@@ -359,7 +359,7 @@ private fun StudioHome(
                                         val script = scriptText.ifBlank { apinex.createScript(match, format, minutes, report.toPromptContext()) }.also { scriptText = it }
                                         LocalProjectStore(context).saveScript(project, match, format, script)
                                         notice = "STAGE 1/3 COMPLETE — research and script saved. STAGE 2/3 — generating Gemini presenter voice…"
-                                        val audio = GeminiClient(activeGeminiVoiceKey).createVoice(
+                                        val audio = GeminiClient(voiceKey).createVoice(
                                             script, java.io.File(project, "voiceover.wav"),
                                             model = "gemini-3.8-flash-lite-tts", voice = "Charon"
                                         ) { progress -> notice = progress }
