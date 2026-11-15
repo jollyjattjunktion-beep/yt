@@ -5,11 +5,12 @@ from .schemas import MatchRequest
 from .research import research_match
 from .scriptwriter import generate_script
 from .renderer import render_video, safe_name
-from .config import settings
+from .config import settings, reload_settings
 
 async def process(job):
     job_id=job["id"]
     try:
+        reload_settings()
         req=MatchRequest.model_validate_json(job["payload"])
         update_job(job_id,status="running",stage="Researching match",progress=8)
         research=await research_match(req.match_name,req.match_facts)
