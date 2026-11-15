@@ -1,8 +1,11 @@
 package com.preetsports.studio
 
-import android.util.Base64
 import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.ReturnCode
+import com.fasterxml.jackson.core.JsonFactory
+import com.fasterxml.jackson.core.JsonToken
+import com.fasterxml.jackson.core.Base64Variants
+import java.io.RandomAccessFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -96,27 +99,40 @@ class ApinexClient(
                 .getString("content").trim().also { require(it.isNotBlank()) { "APInex returned an empty script." } }
         }
 
-    private fun postAudio(url: String, key: String, payload: JSONObject): ByteArray {
+    private fun postAudioToFile(url: String, key: String, payload: JSONObject, target: File): Long {
         val req = Request.Builder().url(url)
             .header("Authorization", "Bearer $key")
             .header("Content-Type", "application/json")
             .post(payload.toString().toRequestBody("application/json".toMediaType()))
             .build()
         http.newCall(req).execute().use { response ->
-            val raw = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
-                val detail = raw.take(450)
+                val detail = response.body?.string().orEmpty().take(450)
                 error(when (response.code) {
                     401, 403 -> "APInex rejected the voice API key (${response.code})."
                     429 -> "APInex voice rate limit reached (429). Wait and retry."
                     else -> "APInex voice request failed (${response.code}): $detail"
                 })
             }
-            val audio = JSONObject(raw).optString("audio_base64")
-            require(audio.isNotBlank()) { "APInex TTS response did not contain audio_base64." }
-            val bytes = Base64.decode(audio, Base64.DEFAULT)
-            require(bytes.isNotEmpty()) { "APInex returned an empty decoded audio segment." }
-            return bytes
+            val body = response.body ?: error("APInex returned an empty voice response.")
+            var decoded = 0L
+            body.byteStream().use { input ->
+                JsonFactory().createParser(input).use { parser ->
+                    while (parser.nextToken() != null) {
+                        if (parser.currentToken == JsonToken.FIELD_NAME && parser.currentName == "audio_base64") {
+                            require(parser.nextToken() == JsonToken.VALUE_STRING) {
+                                "APInex audio_base64 field was not a string."
+                            }
+                            target.outputStream().use { output ->
+                                decoded = parser.readBinaryValue(Base64Variants.getDefaultVariant(), output).toLong()
+                            }
+                            break
+                        }
+                    }
+                }
+            }
+            require(decoded > 100) { "APInex TTS response did not contain usable audio_base64 data." }
+            return decoded
         }
     }
 
@@ -126,47 +142,91 @@ class ApinexClient(
             require(ttsModel.isNotBlank()) { "Enter an APInex TTS model ID in Voice settings." }
             require(script.isNotBlank()) { "Script is empty; generate the script before voice." }
             val chunks = splitForTts(script, 320)
-            outputWav.parentFile?.mkdirs()
-            val segmentDir = File(outputWav.parentFile, "apinex-voice-segments").apply { mkdirs() }
-            val combinedMp3 = File(outputWav.parentFile, "apinex-voice-combined.mp3")
-            // Preserve completed segments. If Android kills the process or the network drops,
-            // the next attempt reuses completed audio rather than starting from segment one.
+            val parent = outputWav.parentFile ?: error("Voice output folder is unavailable.")
+            parent.mkdirs()
+            val segmentDir = File(parent, "apinex-voice-segments").apply { mkdirs() }
+            val pcmFile = File(parent, "voiceover-combined.pcm")
+            val tempMp3 = File(parent, "voice-segment-current.mp3")
+            val tempPcm = File(parent, "voice-segment-current.pcm")
+            // Resume only if the saved manifest matches this exact script and selected model.
+            val signature = (ttsModel + "\n" + script).hashCode().toString()
+            val manifest = File(segmentDir, "manifest.txt")
+            if (!manifest.isFile || manifest.readText() != signature) {
+                segmentDir.listFiles()?.forEach { it.delete() }
+                pcmFile.delete()
+                manifest.writeText(signature)
+            }
+            pcmFile.outputStream().use { /* create/truncate only for a fresh run */ }
+            var totalPcmBytes = 0L
             chunks.forEachIndexed { index, chunk ->
-                val segmentFile = File(segmentDir, "segment-%03d.mp3".format(index + 1))
-                if (segmentFile.isFile && segmentFile.length() > 100) {
-                    onProgress("APInex presenter voice: reusing segment ${index + 1}/${chunks.size}")
-                } else {
-                    onProgress("APInex presenter voice: segment ${index + 1}/${chunks.size} · model $ttsModel…")
-                    val payload = JSONObject()
-                        .put("text", "Read this Roman Hinglish cricket presenter script verbatim. Warm, energetic sports presenter delivery. Do not translate or paraphrase. $chunk")
-                        .put("model", ttsModel)
-                        .put("encoding", "mp3")
-                    val bytes = postAudio("https://api.apinex.bond/v1/tools/voice/tts", voiceApiKey, payload)
-                    require(bytes.size > 100) { "APInex returned an unexpectedly small audio segment ${index + 1}." }
-                    segmentFile.outputStream().use { it.write(bytes) }
+                val mp3 = File(segmentDir, "segment-%03d.mp3".format(index + 1))
+                val pcm = File(segmentDir, "segment-%03d.pcm".format(index + 1))
+                if (!pcm.isFile || pcm.length() <= 100) {
+                    if (!mp3.isFile || mp3.length() <= 100) {
+                        onProgress("APInex voice request ${index + 1}/${chunks.size}…")
+                        val payload = JSONObject()
+                            .put("text", "Read this Roman Hinglish cricket presenter script verbatim. Warm, energetic sports presenter delivery. Do not translate or paraphrase. $chunk")
+                            .put("model", ttsModel)
+                            .put("encoding", "mp3")
+                        postAudioToFile("https://api.apinex.bond/v1/tools/voice/tts", voiceApiKey, payload, mp3)
+                    } else {
+                        onProgress("Reusing downloaded voice segment ${index + 1}/${chunks.size}…")
+                    }
+                    onProgress("Converting voice segment ${index + 1}/${chunks.size}…")
+                    tempPcm.delete()
+                    val command = listOf(
+                        "-y", "-hide_banner", "-loglevel", "error",
+                        "-i", quote(mp3.absolutePath),
+                        "-vn", "-ac", "1", "-ar", "24000", "-f", "s16le",
+                        quote(tempPcm.absolutePath)
+                    ).joinToString(" ")
+                    val session = FFmpegKit.execute(command)
+                    if (!ReturnCode.isSuccess(session.returnCode) || !tempPcm.isFile || tempPcm.length() <= 100) {
+                        error("Voice segment ${index + 1} conversion failed: ${session.allLogsAsString.takeLast(500)}")
+                    }
+                    tempPcm.copyTo(pcm, overwrite = true)
+                    tempMp3.delete()
+                    tempPcm.delete()
                 }
+                totalPcmBytes += pcm.length()
+                onProgress("Voice segment ${index + 1}/${chunks.size} complete.")
             }
-            combinedMp3.outputStream().use { output ->
+            // Build the final WAV sequentially from small on-disk PCM segments.
+            require(totalPcmBytes > 1000) { "APInex voice output is unexpectedly small." }
+            RandomAccessFile(outputWav, "rw").use { wav ->
+                wav.setLength(0)
+                wav.write(byteArrayOf(
+                    0x52,0x49,0x46,0x46, 0,0,0,0, 0x57,0x41,0x56,0x45,
+                    0x66,0x6d,0x74,0x20, 16,0,0,0, 1,0, 1,0,
+                    0xC0.toByte(),0x5D,0,0, 0x80.toByte(),0xBB.toByte(),0,0,
+                    2,0, 16,0, 0x64,0x61,0x74,0x61, 0,0,0,0
+                ))
                 chunks.indices.forEach { index ->
-                    val segmentFile = File(segmentDir, "segment-%03d.mp3".format(index + 1))
-                    require(segmentFile.isFile && segmentFile.length() > 100) { "Voice segment ${index + 1} is missing; retry voice generation." }
-                    segmentFile.inputStream().use { input -> input.copyTo(output, 16 * 1024) }
+                    val pcm = File(segmentDir, "segment-%03d.pcm".format(index + 1))
+                    pcm.inputStream().use { input ->
+                        val buffer = ByteArray(16 * 1024)
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            wav.write(buffer, 0, count)
+                        }
+                    }
                 }
+                val dataSize = wav.length() - 44
+                wav.seek(4); writeLeInt(wav, (wav.length() - 8).toInt())
+                wav.seek(40); writeLeInt(wav, dataSize.toInt())
             }
-            require(combinedMp3.length() > 1000) { "APInex voice output is unexpectedly small." }
-            outputWav.delete()
-            val command = listOf(
-                "-y", "-hide_banner", "-loglevel", "error",
-                "-i", quote(combinedMp3.absolutePath),
-                "-vn", "-ac", "1", "-ar", "24000", "-c:a", "pcm_s16le",
-                quote(outputWav.absolutePath)
-            ).joinToString(" ")
-            val session = FFmpegKit.execute(command)
-            if (!ReturnCode.isSuccess(session.returnCode) || !outputWav.isFile || outputWav.length() <= 44) {
-                error("Could not convert APInex MP3 voice to WAV: ${session.allLogsAsString.takeLast(900)}")
-            }
+            require(outputWav.isFile && outputWav.length() > 44) { "Final presenter WAV could not be created." }
+            pcmFile.delete()
             outputWav
         }
+
+    private fun writeLeInt(file: RandomAccessFile, value: Int) {
+        file.write(value and 0xff)
+        file.write((value ushr 8) and 0xff)
+        file.write((value ushr 16) and 0xff)
+        file.write((value ushr 24) and 0xff)
+    }
 
     private fun splitForTts(text: String, limit: Int): List<String> {
         val sentences = text.replace("\r\n", "\n").split(Regex("(?<=[.!?।])\\s+"))
