@@ -125,11 +125,17 @@ class ApinexClient(
             require(voiceApiKey.isNotBlank()) { "Add your APInex Presenter Voice API key in the relevant APInex setting." }
             require(ttsModel.isNotBlank()) { "Enter an APInex TTS model ID in Voice settings." }
             require(script.isNotBlank()) { "Script is empty; generate the script before voice." }
-            val chunks = splitForTts(script, 700)
+            val chunks = splitForTts(script, 320)
             outputWav.parentFile?.mkdirs()
+            val segmentDir = File(outputWav.parentFile, "apinex-voice-segments").apply { mkdirs() }
             val combinedMp3 = File(outputWav.parentFile, "apinex-voice-combined.mp3")
-            combinedMp3.outputStream().use { stream ->
-                chunks.forEachIndexed { index, chunk ->
+            // Preserve completed segments. If Android kills the process or the network drops,
+            // the next attempt reuses completed audio rather than starting from segment one.
+            chunks.forEachIndexed { index, chunk ->
+                val segmentFile = File(segmentDir, "segment-%03d.mp3".format(index + 1))
+                if (segmentFile.isFile && segmentFile.length() > 100) {
+                    onProgress("APInex presenter voice: reusing segment ${index + 1}/${chunks.size}")
+                } else {
                     onProgress("APInex presenter voice: segment ${index + 1}/${chunks.size} · model $ttsModel…")
                     val payload = JSONObject()
                         .put("text", "Read this Roman Hinglish cricket presenter script verbatim. Warm, energetic sports presenter delivery. Do not translate or paraphrase. $chunk")
@@ -137,8 +143,14 @@ class ApinexClient(
                         .put("encoding", "mp3")
                     val bytes = postAudio("https://api.apinex.bond/v1/tools/voice/tts", voiceApiKey, payload)
                     require(bytes.size > 100) { "APInex returned an unexpectedly small audio segment ${index + 1}." }
-                    stream.write(bytes)
-                    stream.flush()
+                    segmentFile.outputStream().use { it.write(bytes) }
+                }
+            }
+            combinedMp3.outputStream().use { output ->
+                chunks.indices.forEach { index ->
+                    val segmentFile = File(segmentDir, "segment-%03d.mp3".format(index + 1))
+                    require(segmentFile.isFile && segmentFile.length() > 100) { "Voice segment ${index + 1} is missing; retry voice generation." }
+                    segmentFile.inputStream().use { input -> input.copyTo(output, 16 * 1024) }
                 }
             }
             require(combinedMp3.length() > 1000) { "APInex voice output is unexpectedly small." }
