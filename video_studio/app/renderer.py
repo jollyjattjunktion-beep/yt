@@ -41,6 +41,17 @@ def make_card(path: Path, size: tuple[int,int], title: str, subtitle: str, index
     d.rectangle((int(w*.05),int(h*.93),int(w*.95),int(h*.935)),fill=(232,177,76))
     img.save(path, quality=92)
 
+def media_duration(path: Path) -> float:
+    probe = shutil.which("ffprobe")
+    if not probe:
+        raise RuntimeError("ffprobe not found. Install FFmpeg including ffprobe.")
+    proc = subprocess.run([probe, "-v", "error", "-show_entries", "format=duration",
+                           "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
+                          capture_output=True, text=True)
+    if proc.returncode:
+        raise RuntimeError("Could not read voiceover duration: " + proc.stderr[-1000:])
+    return max(10.0, float(proc.stdout.strip()))
+
 def run_ffmpeg(args: list[str]):
     proc=subprocess.run(args,capture_output=True,text=True)
     if proc.returncode:
@@ -63,7 +74,9 @@ async def render_video(script: str, match_name: str, job_dir: Path, voice: str |
     for label,size,suffix in [("landscape",(1920,1080),"16x9"),("portrait",(1080,1920),"9x16")]:
         cards=job_dir/suffix; cards.mkdir(exist_ok=True)
         concat=job_dir/f"{suffix}.txt"
-        durations=[5,8,8,8,5]
+        total_duration = media_duration(audio)
+        weights = [0.14, 0.23, 0.23, 0.22, 0.18]
+        durations = [total_duration * weight for weight in weights]
         with concat.open("w",encoding="utf-8") as f:
             for i,(title,sub) in enumerate(scenes):
                 p=cards/f"scene-{i:02d}.jpg"
