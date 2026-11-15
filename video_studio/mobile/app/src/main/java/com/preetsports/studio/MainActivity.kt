@@ -139,10 +139,21 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                                         scenes.forEachIndexed { index, scene ->
                                             CricketSceneRenderer().savePreview(scene, java.io.File(project, "scene-${index + 1}.jpg"))
                                         }
-                                        val job = StudioJob(project.name, match, format, minutes, "assets_ready", 65,
-                                            "Script, narration and scene graphics generated", project.absolutePath)
+                                        notice = "Assets ready. Rendering landscape MP4 on this phone…"
+                                        val renderer = AndroidMp4Renderer(context)
+                                        val landscape = renderer.render(project, audio, scenes, false) { p ->
+                                            notice = "Rendering landscape video: $p%"
+                                        }
+                                        renderer.publishToMovies(landscape.file)
+                                        notice = "Landscape MP4 saved. Rendering vertical 9:16 version…"
+                                        val vertical = renderer.render(project, audio, scenes, true) { p ->
+                                            notice = "Rendering vertical video: $p%"
+                                        }
+                                        renderer.publishToMovies(vertical.file)
+                                        val job = StudioJob(project.name, match, format, minutes, "completed", 100,
+                                            "Both MP4 formats exported to Movies/Preet Sports", project.absolutePath)
                                         StudioJobStore(context).save(job)
-                                        notice = "On-device assets generated.\\nProject: ${project.absolutePath}\\nScript: script.txt\\nVoice: ${audio.name}\\nGraphics: ${scenes.size} scene cards\\nMP4 video encoding is the next integration stage."
+                                        notice = "Production complete!\\n16:9: ${landscape.file.name}\\n9:16: ${vertical.file.name}\\nBoth videos saved in Movies/Preet Sports.\\nProject: ${project.absolutePath}"
                                     } catch (e: Exception) {
                                         notice = "Production step failed: ${e.message ?: "Unknown error"}"
                                     } finally { busy = false }
