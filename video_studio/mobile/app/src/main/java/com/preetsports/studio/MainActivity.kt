@@ -41,18 +41,19 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val safePrefs = try { prefs } catch (_: Exception) { getSharedPreferences("preet_sports_recovery", MODE_PRIVATE) }
         setContent {
             MaterialTheme(colorScheme = darkColorScheme(
                 primary = Gold, background = Navy, surface = Panel,
                 onPrimary = Navy, onBackground = Color.White, onSurface = Color.White
             )) {
                 StudioHome(
-                    scriptKey = prefs.getString("apinex_script_key", "") ?: "",
-                    voiceKey = prefs.getString("apinex_voice_key", "") ?: "",
-                    voiceModel = prefs.getString("apinex_voice_model", "aura-2-thalia-en") ?: "aura-2-thalia-en",
-                    onSaveScriptKey = { prefs.edit().putString("apinex_script_key", it.trim()).apply() },
-                    onSaveVoiceKey = { prefs.edit().putString("apinex_voice_key", it.trim()).apply() },
-                    onSaveVoiceModel = { prefs.edit().putString("apinex_voice_model", it.trim()).apply() },
+                    scriptKey = safePrefs.getString("apinex_script_key", "") ?: "",
+                    voiceKey = safePrefs.getString("apinex_voice_key", "") ?: "",
+                    voiceModel = safePrefs.getString("apinex_voice_model", "aura-2-thalia-en") ?: "aura-2-thalia-en",
+                    onSaveScriptKey = { safePrefs.edit().putString("apinex_script_key", it.trim()).apply() },
+                    onSaveVoiceKey = { safePrefs.edit().putString("apinex_voice_key", it.trim()).apply() },
+                    onSaveVoiceModel = { safePrefs.edit().putString("apinex_voice_model", it.trim()).apply() },
 
                 )
             }
