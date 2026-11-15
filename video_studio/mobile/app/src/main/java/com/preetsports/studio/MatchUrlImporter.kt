@@ -88,11 +88,17 @@ class MatchUrlImporter {
         MatchResearch(pages, title, venue, date, squad, scorecard, warnings)
     }
 
+    suspend fun fetchTrustedSupplementary(rawUrl: String, source: String): MatchSourcePage = withContext(Dispatchers.IO) {
+        fetch(rawUrl, source)
+    }
+
     private fun fetch(rawUrl: String, source: String): MatchSourcePage {
         val uri = URI(rawUrl.trim())
         val host = uri.host?.lowercase().orEmpty()
         require(uri.scheme == "https" && (host == "icc-cricket.com" || host.endsWith(".icc-cricket.com") ||
-            host == "cricbuzz.com" || host.endsWith(".cricbuzz.com"))) {
+            host == "cricbuzz.com" || host.endsWith(".cricbuzz.com") ||
+            host == "espncricinfo.com" || host.endsWith(".espncricinfo.com") ||
+            host == "howstat.com" || host.endsWith(".howstat.com"))) {
             "Only official ICC and Cricbuzz HTTPS URLs are accepted."
         }
         val request = Request.Builder().url(uri.toASCIIString())
