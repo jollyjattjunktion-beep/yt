@@ -58,6 +58,9 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
     var match by remember { mutableStateOf("") }
+    var iccUrl by remember { mutableStateOf("https://www.icc-cricket.com/tournaments/icc-women-s-emerging-nations-trophy-2026/matches/275635/zimbabwe-vs-pakistan") }
+    var cricbuzzUrl by remember { mutableStateOf("https://www.cricbuzz.com/live-cricket-scores/177481/zimw-vs-pakw-14th-match-group-b-icc-womens-emerging-nations-trophy-2026") }
+    var importedResearch by remember { mutableStateOf<MatchResearch?>(null) }
     var format by remember { mutableStateOf("T20") }
     var duration by remember { mutableStateOf("5 minutes") }
     var apiKey by remember { mutableStateOf("") }
@@ -81,7 +84,7 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
     ) {
         Text("PREET SPORTS", color = Gold, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
         Text("AI Cricket Production Studio", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("Create Roman Hinglish cricket videos directly on your Android device.", color = Color.LightGray)
+        Text("Paste match links, fetch verified cricket information and create photo-led Roman Hinglish videos on your Android device.", color = Color.LightGray)
         Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("01 · Match setup", color = Gold, fontWeight = FontWeight.Bold)
@@ -112,7 +115,42 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
         }
         Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("02 · Gemini settings", color = Gold, fontWeight = FontWeight.Bold)
+                Text("02 · Import match from URLs", color = Gold, fontWeight = FontWeight.Bold)
+                Text("Paste official ICC and Cricbuzz match links. The app fetches available page details and related squad/scorecard links.", color = Color.LightGray)
+                OutlinedTextField(value = iccUrl, onValueChange = { iccUrl = it; importedResearch = null }, label = { Text("ICC match URL") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+                OutlinedTextField(value = cricbuzzUrl, onValueChange = { cricbuzzUrl = it; importedResearch = null }, label = { Text("Cricbuzz match URL") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+                OutlinedButton(
+                    enabled = !busy && (iccUrl.isNotBlank() || cricbuzzUrl.isNotBlank()),
+                    onClick = {
+                        busy = true
+                        notice = "Fetching match details from ICC and Cricbuzz…"
+                        scope.launch {
+                            try {
+                                val research = MatchUrlImporter().import(iccUrl, cricbuzzUrl)
+                                importedResearch = research
+                                if (match.isBlank()) match = research.matchTitle
+                                notice = "Match sources imported. Review the extracted details below."
+                            } catch (e: Exception) {
+                                notice = "Match import failed: ${e.message ?: "Unknown error"}"
+                            } finally { busy = false }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text(if (busy) "Fetching sources…" else "Fetch match data") }
+                importedResearch?.let { research ->
+                    Text("MATCH: ${research.matchTitle}", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("VENUE: ${research.venue ?: "Not verified"}", color = Color.LightGray)
+                    Text("DATE: ${research.dateTime ?: "Not verified"}", color = Color.LightGray)
+                    Text("SQUADS: ${research.squadUrl ?: "Link not found"}", color = Color.LightGray)
+                    Text("SCORECARD: ${research.scorecardUrl ?: "Link not found"}", color = Color.LightGray)
+                    research.warnings.forEach { Text("• $it", color = Gold, style = MaterialTheme.typography.bodySmall) }
+                    Text("Imported source text is retained in this project and passed to script generation.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+        Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("03 · Gemini settings", color = Gold, fontWeight = FontWeight.Bold)
                 OutlinedTextField(value = apiKey, onValueChange = { apiKey = it }, label = { Text("Gemini API key") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                 Button(onClick = {
                     if (apiKey.isNotBlank()) { onSaveKey(apiKey); activeKey = apiKey.trim(); apiKey = ""; keySaved = true; notice = "Gemini key saved securely on this device." }
@@ -123,7 +161,7 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
         }
         Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("03 · Match photos", color = Gold, fontWeight = FontWeight.Bold)
+                Text("04 · Optional match photos", color = Gold, fontWeight = FontWeight.Bold)
                 Text("Select up to 14 images in this order: venue, home-team, away-team, then player portraits.", color = Color.LightGray)
                 OutlinedButton(
                     onClick = { photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
@@ -135,7 +173,7 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
         }
         Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("04 · Production modules", color = Gold, fontWeight = FontWeight.Bold)
+                Text("05 · Production modules", color = Gold, fontWeight = FontWeight.Bold)
                 listOf("Roman Hinglish commentary", "Gemini presenter voice", "Stadium and team graphics", "Player cards and pitch report", "Head-to-head and match analysis", "9:16 and 16:9 video exports").forEach {
                     Text("✓  $it", color = Color.White)
                 }
@@ -168,7 +206,11 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                                         }
                                         val minutes = duration.substringBefore(" ").toIntOrNull() ?: 5
                                         val gemini = GeminiClient(key)
-                                        val script = gemini.createScript(match, format, minutes)
+                                        val research = importedResearch
+                                        if (research != null) {
+                                            java.io.File(project, "match-research.txt").writeText(research.toPromptContext())
+                                        }
+                                        val script = gemini.createScript(match, format, minutes, research?.toPromptContext().orEmpty())
                                         LocalProjectStore(context).saveScript(project, match, format, script)
                                         notice = "Script ready. Generating presenter voice…"
                                         val audio = gemini.createVoice(script, java.io.File(project, "voiceover.wav"))
