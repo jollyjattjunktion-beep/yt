@@ -189,12 +189,26 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
         Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("03 · Gemini settings", color = Gold, fontWeight = FontWeight.Bold)
-                OutlinedTextField(value = apiKey, onValueChange = { apiKey = it }, label = { Text("Gemini API key") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                Button(onClick = {
-                    if (apiKey.isNotBlank()) { onSaveKey(apiKey); activeKey = apiKey.trim(); apiKey = ""; keySaved = true; notice = "Gemini key saved securely on this device." }
-                    else notice = if (keySaved) "A Gemini key is already saved on this device." else "Enter your Gemini API key first."
-                }, modifier = Modifier.fillMaxWidth()) { Text("Save key securely") }
-                Text(if (keySaved) "API key saved on device" else "API key not configured", color = if (keySaved) Gold else Color.LightGray)
+                OutlinedTextField(
+                    value = apiKey,
+                    onValueChange = { entered ->
+                        apiKey = entered
+                        if (entered.isNotBlank()) {
+                            onSaveKey(entered)
+                            activeKey = entered.trim()
+                            keySaved = true
+                            notice = "Gemini key automatically saved securely on this device."
+                        }
+                    },
+                    label = { Text("Gemini API key") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Text(
+                    if (keySaved) "✓ Gemini key auto-saved securely on this device. It will be reused next time."
+                    else "Enter your Gemini key once. It will be saved automatically.",
+                    color = if (keySaved) Gold else Color.LightGray
+                )
             }
         }
         Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
