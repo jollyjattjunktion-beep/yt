@@ -32,6 +32,7 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.fasterxml.jackson.core:jackson-core:2.18.2")
     implementation("org.jsoup:jsoup:1.18.3")
     // Maintained Android FFmpegKit continuation; LGPL build, pinned version.
     implementation("dev.ffmpegkit-maintained:ffmpeg-kit-full:8.1.7")
