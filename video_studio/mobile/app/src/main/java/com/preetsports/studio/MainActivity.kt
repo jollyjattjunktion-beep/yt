@@ -49,8 +49,10 @@ class MainActivity : ComponentActivity() {
             )) {
                 StudioHome(
                     scriptKey = safePrefs.getString("apinex_script_key", "") ?: "",
+                    scriptModel = safePrefs.getString("apinex_script_model", "gemini-3.8-flash") ?: "gemini-3.8-flash",
                     geminiVoiceKey = safePrefs.getString("gemini_voice_key", "") ?: "",
                     onSaveScriptKey = { safePrefs.edit().putString("apinex_script_key", it.trim()).apply() },
+                    onSaveScriptModel = { safePrefs.edit().putString("apinex_script_model", it.trim()).apply() },
                     onSaveGeminiVoiceKey = { safePrefs.edit().putString("gemini_voice_key", it.trim()).apply() },
 
                 )
@@ -61,8 +63,9 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun StudioHome(
-    scriptKey: String, geminiVoiceKey: String,
-    onSaveScriptKey: (String) -> Unit, onSaveGeminiVoiceKey: (String) -> Unit
+    scriptKey: String, scriptModel: String, geminiVoiceKey: String,
+    onSaveScriptKey: (String) -> Unit, onSaveScriptModel: (String) -> Unit,
+    onSaveGeminiVoiceKey: (String) -> Unit
 ) {
     var match by remember { mutableStateOf("") }
     var iccUrl by remember { mutableStateOf("https://www.icc-cricket.com/tournaments/icc-women-s-emerging-nations-trophy-2026/matches/275635/zimbabwe-vs-pakistan") }
@@ -83,6 +86,8 @@ private fun StudioHome(
     var format by remember { mutableStateOf("T20") }
     var duration by remember { mutableStateOf("5 minutes") }
     var scriptApiKey by remember { mutableStateOf("") }
+    var scriptModelInput by remember { mutableStateOf(scriptModel) }
+    var activeScriptModel by remember { mutableStateOf(scriptModel) }
     var geminiVoiceApiKey by remember { mutableStateOf("") }
     var activeScriptKey by remember { mutableStateOf(scriptKey) }
     var activeGeminiVoiceKey by remember { mutableStateOf(geminiVoiceKey) }
@@ -217,6 +222,21 @@ private fun StudioHome(
                 )
                 Text(if (scriptKeySaved) "✓ Script key saved securely." else "Required for Roman Hinglish script generation.", color = if (scriptKeySaved) Gold else Color.LightGray)
                 OutlinedTextField(
+                    value = scriptModelInput,
+                    onValueChange = { entered ->
+                        scriptModelInput = entered
+                        if (entered.isNotBlank()) {
+                            activeScriptModel = entered.trim()
+                            onSaveScriptModel(entered)
+                            notice = "APInex script model saved: ${entered.trim()}"
+                        }
+                    },
+                    label = { Text("APInex script model ID") },
+                    placeholder = { Text("gemini-3.8-flash") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true
+                )
+                Text("Paid Gemini Flash: gemini-3.8-flash · Free tier model: free/gemini-3.8-flash. Paid model usage is billed to your APInex wallet.", color = Gold, style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(
                     value = geminiVoiceApiKey,
                     onValueChange = { entered ->
                         geminiVoiceApiKey = entered
@@ -255,7 +275,7 @@ private fun StudioHome(
                                 }
                                 researchProjectPath = project.absolutePath
                                 val minutes = duration.substringBefore(" ").toIntOrNull() ?: 5
-                                val generated = ApinexClient(key, key, ttsModel = activeTtsModel)
+                                val generated = ApinexClient(key, key, scriptModel = activeScriptModel)
                                     .createScript(match, format, minutes, report.toPromptContext())
                                 scriptText = generated
                                 LocalProjectStore(context).saveScript(project, match, format, generated)
@@ -335,7 +355,7 @@ private fun StudioHome(
                                             }
                                         }
                                         val minutes = duration.substringBefore(" ").toIntOrNull() ?: 5
-                                        val apinex = ApinexClient(textKey, textKey)
+                                        val apinex = ApinexClient(textKey, textKey, scriptModel = activeScriptModel)
                                         val script = scriptText.ifBlank { apinex.createScript(match, format, minutes, report.toPromptContext()) }.also { scriptText = it }
                                         LocalProjectStore(context).saveScript(project, match, format, script)
                                         notice = "STAGE 1/3 COMPLETE — research and script saved. STAGE 2/3 — generating Gemini presenter voice…"
