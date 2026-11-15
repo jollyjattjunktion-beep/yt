@@ -14,7 +14,8 @@ data class MatchSourcePage(
     val title: String,
     val description: String,
     val extractedText: String,
-    val relatedLinks: Map<String, String>
+    val relatedLinks: Map<String, String>,
+    val imageLinks: Map<String, String>
 )
 
 data class MatchResearch(
@@ -34,6 +35,7 @@ data class MatchResearch(
             if (page.description.isNotBlank()) appendLine("DESCRIPTION: ${page.description}")
             appendLine("EXTRACTED PAGE TEXT: ${page.extractedText.take(9000)}")
             page.relatedLinks.forEach { (label, url) -> appendLine("RELATED $label: $url") }
+            page.imageLinks.forEach { (label, url) -> appendLine("IMAGE $label: $url") }
         }
         appendLine("VENUE: ${venue ?: "Not verified from supplied pages"}")
         appendLine("DATE/TIME: ${dateTime ?: "Not verified from supplied pages"}")
@@ -65,13 +67,19 @@ class MatchUrlImporter {
         require(pages.isNotEmpty()) { "Neither match URL could be imported. Check the links or try again later." }
 
         val allText = pages.joinToString("\n") { it.extractedText }
-        val venue = Regex("Venue:\\s*([^\\n•]+)", RegexOption.IGNORE_CASE)
+        val venue = Regex("Venue:\\s*([^•]+)", RegexOption.IGNORE_CASE)
             .find(allText)?.groupValues?.getOrNull(1)?.trim()
-        val date = Regex("Date & Time:\\s*([^\\n]+)", RegexOption.IGNORE_CASE)
+        val date = Regex("Date & Time:\\s*([^•]+)", RegexOption.IGNORE_CASE)
             .find(allText)?.groupValues?.getOrNull(1)?.trim()
         val cricbuzz = pages.firstOrNull { it.source == "Cricbuzz" }
         val squad = cricbuzz?.relatedLinks?.entries?.firstOrNull { it.key.contains("squad", true) }?.value
         val scorecard = cricbuzz?.relatedLinks?.entries?.firstOrNull { it.key.contains("scorecard", true) }?.value
+        val info = cricbuzz?.relatedLinks?.entries?.firstOrNull { it.key.equals("Info", true) }?.value
+        listOf("Cricbuzz Squads" to squad, "Cricbuzz Info" to info, "Cricbuzz Scorecard" to scorecard)
+            .forEach { (label, url) ->
+                if (url != null) try { pages += fetch(url, label) }
+                catch (e: Exception) { warnings += "$label page could not be read: ${e.message}" }
+            }
         val title = cricbuzz?.title?.takeIf { it.isNotBlank() }
             ?: pages.first().title
         if (venue == null) warnings += "Venue was not extracted; confirm it before using it in the video."
@@ -113,7 +121,15 @@ class MatchUrlImporter {
                     links[label.take(60)] = href
                 }
             }
-            MatchSourcePage(source, uri.toString(), title, description, text.take(18000), links)
+            val images = linkedMapOf<String, String>()
+            doc.select("img").forEach { img ->
+                val label = img.attr("alt").ifBlank { img.attr("title") }.trim()
+                val imageUrl = img.absUrl("src").ifBlank { img.absUrl("data-src") }
+                if (label.isNotBlank() && imageUrl.startsWith("https://") && images.size < 40) {
+                    images[label.take(80)] = imageUrl
+                }
+            }
+            MatchSourcePage(source, uri.toString(), title, description, text.take(18000), links, images)
         }
     }
 }
