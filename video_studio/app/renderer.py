@@ -114,6 +114,7 @@ async def render_video(script: str,match_name: str,job_dir: Path,voice: str|None
           "-c:a","aac","-b:a","192k","-shortest","-movflags","+faststart",str(out)])
         if not out.is_file() or out.stat().st_size<10000: raise RuntimeError(f"Render quality check failed for {suffix}.")
         outputs.append(out)
+    (job_dir/"script.txt").write_text(script,encoding="utf-8")
     thumb=job_dir/"thumbnail.jpg"
     make_card(thumb,(1280,720),"MATCH PREVIEW",match_name,1)
     metadata={"title":f"{match_name} | Match Preview | Preet Sports","description":f"Roman Hinglish cricket analysis: {match_name}. Independent commentary and analysis.\n\n#Cricket #PreetSports","tags":["cricket","match preview","preet sports","cricket analysis"]}
