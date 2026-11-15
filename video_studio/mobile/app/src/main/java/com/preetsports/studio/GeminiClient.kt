@@ -69,7 +69,7 @@ class GeminiClient(private val apiKey: String) {
             .getJSONArray("parts").getJSONObject(0).getString("text").trim()
     }
 
-    suspend fun createVoice(script: String, output: File, model: String = "gemini-3.8-flash-lite-tts", voice: String = "Charon"): File =
+    suspend fun createVoice(script: String, output: File, model: String = "gemini-3.8-flash-lite-tts", voice: String = "Charon", onProgress: (String) -> Unit = {}): File =
         withContext(Dispatchers.IO) {
             require(apiKey.isNotBlank()) { "Add your Gemini API key in Settings first." }
             require(script.isNotBlank()) { "Script is empty; generate the script before voice." }
