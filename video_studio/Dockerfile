@@ -7,4 +7,4 @@ COPY app ./app
 RUN mkdir -p /studio/output
 ENV OUTPUT_DIR=/studio/output
 EXPOSE 8000
-CMD ["uvicorn","app.main:app","--host","0.0.0.0","--port","8000"]
+CMD ["sh","-c","uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-10000}"]
