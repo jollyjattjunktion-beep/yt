@@ -20,5 +20,30 @@ form.addEventListener('submit',async e=>{e.preventDefault();links.innerHTML='';j
 let facts={};try{facts=JSON.parse(document.querySelector('#facts').value||'{}')}catch{status.textContent='Match facts must be valid JSON.';return}
 const payload={match_name:document.querySelector('#match').value,format:document.querySelector('#format').value,duration_minutes:+document.querySelector('#duration').value,language:'Roman Hinglish',voice:document.querySelector('#voice').value,match_facts:facts,publish_to_youtube:document.querySelector('#publish').checked,privacy_status:document.querySelector('#privacy').value};
 try{const res=await fetch('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});if(!res.ok)throw new Error(await res.text());const data=await res.json();poll(data.job_id)}catch(err){status.textContent='Error: '+err.message}});
-async function poll(id){try{const r=await fetch('/api/jobs/'+id);const j=await r.json();status.textContent='Job '+id+'\nStatus: '+j.status+(j.error?'\nError: '+j.error:'');if(j.status==='completed'){links.innerHTML=['landscape','portrait','audio','script','metadata'].map(k=>'<a href="/api/jobs/'+id+'/files/'+k+'" download>'+k+'</a>').join('');return}if(j.status==='failed')return;setTimeout(()=>poll(id),3000)}catch(e){status.textContent=e.message}}
+let pollTimer=null, pollFailures=0;
+async function poll(id){
+ clearTimeout(pollTimer);
+ try{
+  const r=await fetch('/api/jobs/'+encodeURIComponent(id),{cache:'no-store'});
+  const raw=await r.text();
+  let j=null;try{j=raw?JSON.parse(raw):null}catch{}
+  if(!r.ok){
+   if(r.status===404){status.textContent='Job '+id+' was not found. The server may have restarted and lost its in-memory job record. Check server health before submitting again.';return}
+   throw new Error('HTTP '+r.status+': '+(raw||'empty server response'));
+  }
+  if(!j)throw new Error('Empty or invalid JSON response from server.');
+  pollFailures=0;
+  status.textContent='Job '+id+'\\nStatus: '+j.status+(j.error?'\\nError: '+j.error:'');
+  if(j.status==='completed'){
+   links.innerHTML=['landscape','portrait','audio','script','metadata'].map(k=>'<a href="/api/jobs/'+id+'/files/'+k+'" download>'+k+'</a>').join('');return;
+  }
+  if(j.status==='failed')return;
+  pollTimer=setTimeout(()=>poll(id),3000);
+ }catch(e){
+  pollFailures++;
+  status.textContent='Job '+id+'\\nStatus check failed ('+pollFailures+'): '+e.message+'\\nRetrying automatically…';
+  if(pollFailures<=10)pollTimer=setTimeout(()=>poll(id),Math.min(15000,3000*pollFailures));
+  else status.textContent+='\\nAutomatic retries paused. Refresh the page or check Render service health.';
+ }
+}
 </script></main></body></html>
