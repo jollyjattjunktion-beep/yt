@@ -144,6 +144,9 @@ class ApinexClient(
 
     suspend fun createVoice(script: String, outputWav: File, onProgress: (String) -> Unit = {}): File =
         withContext(Dispatchers.IO) {
+            suspend fun reportProgress(message: String) {
+                withContext(Dispatchers.Main.immediate) { onProgress(message) }
+            }
             require(voiceApiKey.isNotBlank()) { "Add your APInex Presenter Voice API key in the relevant APInex setting." }
             require(ttsModel.isNotBlank()) { "Enter an APInex TTS model ID in Voice settings." }
             require(script.isNotBlank()) { "Script is empty; generate the script before voice." }
@@ -170,7 +173,7 @@ class ApinexClient(
                 if (!pcm.isFile || pcm.length() <= 100) {
                     if (!mp3.isFile || mp3.length() <= 100) {
                         diagnostic.appendText("Segment ${index + 1}: preparing request; textChars=${chunk.length}\n")
-                        onProgress("APInex voice request ${index + 1}/${chunks.size}…")
+                        reportProgress("APInex voice request ${index + 1}/${chunks.size}…")
                         val payload = JSONObject()
                             .put("text", "Read this Roman Hinglish cricket presenter script verbatim. Warm, energetic sports presenter delivery. Do not translate or paraphrase. $chunk")
                             .put("model", ttsModel)
