@@ -64,6 +64,8 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
     var h2hSourceUrl by remember { mutableStateOf("") }
     var playerNames by remember { mutableStateOf("") }
     var portraitStatus by remember { mutableStateOf("") }
+    var youtubeAccessToken by remember { mutableStateOf("") }
+    var completedProjectPath by remember { mutableStateOf("") }
     var importedResearch by remember { mutableStateOf<MatchResearch?>(null) }
     var researchReport by remember { mutableStateOf<MatchResearchReport?>(null) }
     var stageOneDone by remember { mutableStateOf(false) }
@@ -280,6 +282,7 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                                         stageTwoDone = true
                                         notice = "STAGE 2/3 COMPLETE — both videos exported. STAGE 3/3 — generating thumbnails and YouTube metadata…"
                                         val packageFiles = YouTubePackageBuilder().build(project, match, format, script, scenes)
+                                        completedProjectPath = project.absolutePath
                                         stageThreeDone = true
                                         val job = StudioJob(project.name, match, format, minutes, "completed", 100,
                                             "All three stages complete; YouTube package generated", project.absolutePath)
@@ -293,6 +296,32 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                         }
                     }, modifier = Modifier.fillMaxWidth()
                 ) { Text(if (busy) "Running production stages…" else "Run all 3 production stages") }
+            }
+        }
+        Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("YouTube upload — optional", color = Gold, fontWeight = FontWeight.Bold)
+                Text("Connect using a short-lived OAuth access token with the youtube.upload scope. Uploads are PRIVATE by default; review in YouTube Studio before making public.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(value = youtubeAccessToken, onValueChange = { youtubeAccessToken = it }, label = { Text("YouTube OAuth access token") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+                Button(enabled = !busy && completedProjectPath.isNotBlank() && youtubeAccessToken.isNotBlank(), onClick = {
+                    busy = true
+                    scope.launch {
+                        try {
+                            val project = java.io.File(completedProjectPath)
+                            val metadata = java.io.File(project, "youtube-metadata.txt").readText()
+                            val title = metadata.substringAfter("TITLE\\n").substringBefore("\\n\\nDESCRIPTION").trim()
+                            val description = metadata.substringAfter("DESCRIPTION\\n").substringBefore("\\n\\nTAGS").trim()
+                            val tags = metadata.substringAfter("TAGS\\n").substringBefore("\\n\\nSCRIPT")
+                                .split(",").map { it.trim() }.filter { it.isNotBlank() }
+                            val result = YouTubeUploader().uploadPrivate(
+                                java.io.File(project, "preet-sports-16x9.mp4"), title, description, tags, youtubeAccessToken.trim()
+                            )
+                            notice = "Uploaded privately: ${result.watchUrl}. Open YouTube Studio to review and publish."
+                            youtubeAccessToken = ""
+                        } catch (e: Exception) { notice = "YouTube upload failed: ${e.message ?: "Unknown error"}" }
+                        finally { busy = false }
+                    }
+                }, modifier = Modifier.fillMaxWidth()) { Text("Upload 16:9 video as PRIVATE") }
             }
         }
         Text(notice, color = Gold)
