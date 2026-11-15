@@ -1,6 +1,7 @@
 """Optional YouTube upload. Requires the channel owner's OAuth consent."""
-import json
+import json, pickle
 from pathlib import Path
+from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -12,8 +13,18 @@ def upload_video(video_path: str, metadata_path: str, privacy_status: str = "pri
     if not settings.youtube_client_secrets_file.is_file():
         raise RuntimeError("YouTube OAuth client file is missing. Add client_secret.json locally; never commit it.")
     metadata=json.loads(Path(metadata_path).read_text(encoding="utf-8"))
-    flow=InstalledAppFlow.from_client_secrets_file(str(settings.youtube_client_secrets_file),SCOPES)
-    credentials=flow.run_local_server(port=0,open_browser=True)
+    credentials=None
+    if settings.youtube_token_file.is_file():
+        with settings.youtube_token_file.open("rb") as token:
+            credentials=pickle.load(token)
+    if credentials and credentials.expired and credentials.refresh_token:
+        credentials.refresh(Request())
+    if not credentials or not credentials.valid:
+        flow=InstalledAppFlow.from_client_secrets_file(str(settings.youtube_client_secrets_file),SCOPES)
+        credentials=flow.run_local_server(port=0,open_browser=True)
+    settings.youtube_token_file.parent.mkdir(parents=True,exist_ok=True)
+    with settings.youtube_token_file.open("wb") as token:
+        pickle.dump(credentials,token)
     service=build("youtube","v3",credentials=credentials)
     body={"snippet":{"title":metadata["title"][:100],
       "description":metadata["description"][:5000],
