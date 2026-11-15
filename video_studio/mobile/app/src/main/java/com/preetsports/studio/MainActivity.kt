@@ -47,8 +47,10 @@ class MainActivity : ComponentActivity() {
                 onPrimary = Navy, onBackground = Color.White, onSurface = Color.White
             )) {
                 StudioHome(
-                    savedKey = prefs.getString("gemini_api_key", "") ?: "",
-                    onSaveKey = { prefs.edit().putString("gemini_api_key", it.trim()).apply() }
+                    scriptKey = prefs.getString("apinex_script_key", "") ?: "",
+                    voiceKey = prefs.getString("apinex_voice_key", "") ?: "",
+                    onSaveScriptKey = { prefs.edit().putString("apinex_script_key", it.trim()).apply() },
+                    onSaveVoiceKey = { prefs.edit().putString("apinex_voice_key", it.trim()).apply() }
                 )
             }
         }
@@ -56,7 +58,10 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
+private fun StudioHome(
+    scriptKey: String, voiceKey: String,
+    onSaveScriptKey: (String) -> Unit, onSaveVoiceKey: (String) -> Unit
+) {
     var match by remember { mutableStateOf("") }
     var iccUrl by remember { mutableStateOf("https://www.icc-cricket.com/tournaments/icc-women-s-emerging-nations-trophy-2026/matches/275635/zimbabwe-vs-pakistan") }
     var cricbuzzUrl by remember { mutableStateOf("https://www.cricbuzz.com/live-cricket-scores/177481/zimw-vs-pakw-14th-match-group-b-icc-womens-emerging-nations-trophy-2026") }
@@ -74,9 +79,12 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
     var researchProjectPath by remember { mutableStateOf("") }
     var format by remember { mutableStateOf("T20") }
     var duration by remember { mutableStateOf("5 minutes") }
-    var apiKey by remember { mutableStateOf("") }
-    var keySaved by remember { mutableStateOf(savedKey.isNotBlank()) }
-    var activeKey by remember { mutableStateOf(savedKey) }
+    var scriptApiKey by remember { mutableStateOf("") }
+    var voiceApiKey by remember { mutableStateOf("") }
+    var activeScriptKey by remember { mutableStateOf(scriptKey) }
+    var activeVoiceKey by remember { mutableStateOf(voiceKey) }
+    var scriptKeySaved by remember { mutableStateOf(scriptKey.isNotBlank()) }
+    var voiceKeySaved by remember { mutableStateOf(voiceKey.isNotBlank()) }
     var notice by remember { mutableStateOf("Ready to configure your production studio.") }
     var busy by remember { mutableStateOf(false) }
     var photoUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
@@ -188,27 +196,39 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
         }
         Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("03 · Gemini settings", color = Gold, fontWeight = FontWeight.Bold)
+                Text("03 · APInex settings", color = Gold, fontWeight = FontWeight.Bold)
+                Text("Separate credentials for script generation and presenter voice. You may use the same APInex key in both fields; each is saved independently and encrypted on this device.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
                 OutlinedTextField(
-                    value = apiKey,
+                    value = scriptApiKey,
                     onValueChange = { entered ->
-                        apiKey = entered
+                        scriptApiKey = entered
                         if (entered.isNotBlank()) {
-                            onSaveKey(entered)
-                            activeKey = entered.trim()
-                            keySaved = true
-                            notice = "Gemini key automatically saved securely on this device."
+                            onSaveScriptKey(entered)
+                            activeScriptKey = entered.trim()
+                            scriptKeySaved = true
+                            notice = "APInex script key securely saved on this device."
                         }
                     },
-                    label = { Text("Gemini API key") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    label = { Text("APInex Script API key") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true
                 )
-                Text(
-                    if (keySaved) "✓ Gemini key auto-saved securely on this device. It will be reused next time."
-                    else "Enter your Gemini key once. It will be saved automatically.",
-                    color = if (keySaved) Gold else Color.LightGray
+                Text(if (scriptKeySaved) "✓ Script key saved securely." else "Required for Roman Hinglish script generation.", color = if (scriptKeySaved) Gold else Color.LightGray)
+                OutlinedTextField(
+                    value = voiceApiKey,
+                    onValueChange = { entered ->
+                        voiceApiKey = entered
+                        if (entered.isNotBlank()) {
+                            onSaveVoiceKey(entered)
+                            activeVoiceKey = entered.trim()
+                            voiceKeySaved = true
+                            notice = "APInex presenter voice key securely saved on this device."
+                        }
+                    },
+                    label = { Text("APInex Presenter Voice API key") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true
                 )
+                Text(if (voiceKeySaved) "✓ Presenter voice key saved securely." else "Required for APInex text-to-speech.", color = if (voiceKeySaved) Gold else Color.LightGray)
+                Text("Script model: free/gemini-3.8-flash · Voice model: aura-2-thalia-en. Voice is converted locally to WAV for video rendering.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
             }
         }
         Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
@@ -228,7 +248,7 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                 Text("03 · Stages 2 and 3 — Video & YouTube package", color = Gold, fontWeight = FontWeight.Bold)
                 Text("Stage 1: research + script  ·  Stage 2: voice + 16:9/9:16 MP4  ·  Stage 3: thumbnails + metadata + ZIP package", color = Color.LightGray)
                 Text("05 · Production modules", color = Gold, fontWeight = FontWeight.Bold)
-                listOf("Roman Hinglish commentary", "Gemini presenter voice", "Stadium and team graphics", "Player cards and pitch report", "Head-to-head and match analysis", "9:16 and 16:9 video exports").forEach {
+                listOf("Roman Hinglish commentary", "APInex presenter voice", "Stadium and team graphics", "Player cards and pitch report", "Head-to-head and match analysis", "9:16 and 16:9 video exports").forEach {
                     Text("✓  $it", color = Color.White)
                 }
                 Button(
@@ -237,13 +257,15 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                         when {
                             match.isBlank() -> notice = "Enter a match name to start."
                             iccUrl.isBlank() && cricbuzzUrl.isBlank() -> notice = "Add at least one ICC or Cricbuzz URL before starting research."
-                            !keySaved && apiKey.isBlank() -> notice = "Save your Gemini API key first."
+                            !(scriptKeySaved || scriptApiKey.isNotBlank()) -> notice = "Enter your APInex Script API key first."
+                            !(voiceKeySaved || voiceApiKey.isNotBlank()) -> notice = "Enter your APInex Presenter Voice API key first."
                             else -> {
                                 busy = true
                                 notice = "STAGE 1/3 — Researching both match sources…"
                                 scope.launch {
                                     try {
-                                        val key = if (apiKey.isNotBlank()) apiKey.trim() else activeKey
+                                        val textKey = if (scriptApiKey.isNotBlank()) scriptApiKey.trim() else activeScriptKey
+                                        val speechKey = if (voiceApiKey.isNotBlank()) voiceApiKey.trim() else activeVoiceKey
                                         val project = if (researchProjectPath.isNotBlank() && java.io.File(researchProjectPath).isDirectory)
                                             java.io.File(researchProjectPath) else LocalProjectStore(context).createProject(match)
                                         val report = researchReport ?: MatchResearchEngine().research(iccUrl, cricbuzzUrl, pitchSourceUrl, h2hSourceUrl).also {
@@ -267,11 +289,13 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                                             }
                                         }
                                         val minutes = duration.substringBefore(" ").toIntOrNull() ?: 5
-                                        val gemini = GeminiClient(key)
-                                        val script = gemini.createScript(match, format, minutes, report.toPromptContext())
+                                        val apinex = ApinexClient(textKey, speechKey)
+                                        val script = apinex.createScript(match, format, minutes, report.toPromptContext())
                                         LocalProjectStore(context).saveScript(project, match, format, script)
-                                        notice = "STAGE 1/3 COMPLETE — research and full script saved. STAGE 2/3 — generating presenter voice…"
-                                        val audio = gemini.createVoice(script, java.io.File(project, "voiceover.wav"))
+                                        notice = "STAGE 1/3 COMPLETE — research and script saved. STAGE 2/3 — generating APInex presenter voice…"
+                                        val audio = apinex.createVoice(script, java.io.File(project, "voiceover.wav")) { progress ->
+                                            notice = progress
+                                        }
                                         val scenes = CricketSceneRenderer().defaultScenes(match, format)
                                         val photoAssets = ScenePhotoAssets.load(project)
                                         try {
@@ -339,6 +363,6 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
             }
         }
         Text(notice, color = Gold)
-        Text("Stage 1: URL research + script · Stage 2: Gemini voice + on-device MP4 · Stage 3: thumbnail + metadata + ZIP. YouTube upload remains manual; review every fact and image licence before publishing.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+        Text("Stage 1: URL research + APInex script · Stage 2: APInex voice + on-device MP4 · Stage 3: thumbnail + metadata + ZIP. YouTube upload remains manual; review every fact and image licence before publishing.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
     }
 }
