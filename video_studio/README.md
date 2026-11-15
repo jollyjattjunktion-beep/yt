@@ -50,3 +50,8 @@ Generated jobs are stored in `data/studio.sqlite3`. Media is stored under `outpu
 - YouTube publishing is not enabled in this local foundation.
 
 Do not publish a video as a complete match preview until its research facts and generated output have been checked.
+
+
+## Android native renderer
+
+The Android project under `mobile/` now includes an on-device H.264/AAC MP4 renderer and dual 16:9/9:16 export integration. CI validates Python tests and assembles a debug APK. A green CI build is not a substitute for playback testing on the target Android handset; device validation is still required before release.
