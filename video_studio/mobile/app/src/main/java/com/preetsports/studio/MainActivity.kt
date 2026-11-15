@@ -91,7 +91,6 @@ private fun StudioHome(
     var voiceKeySaved by remember { mutableStateOf(voiceKey.isNotBlank()) }
     var ttsModelInput by remember { mutableStateOf("") }
     var activeTtsModel by remember { mutableStateOf(voiceModel) }
-    var activeTtsVoice by remember { mutableStateOf(voiceId) }
     var notice by remember { mutableStateOf("Ready to configure your production studio.") }
     var busy by remember { mutableStateOf(false) }
     var photoUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
