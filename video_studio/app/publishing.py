@@ -17,10 +17,9 @@ def upload_video(video_path: str, metadata_path: str, privacy_status: str = "pri
     service=build("youtube","v3",credentials=credentials)
     body={"snippet":{"title":metadata["title"][:100],
       "description":metadata["description"][:5000],
-      "tags":metadata.get("tags",[])[:500],"categoryId":" क्रिकेट"},
+      "tags":metadata.get("tags",[])[:500],"categoryId":"17"},
       "status":{"privacyStatus":privacy_status,"selfDeclaredMadeForKids":False}}
-    # YouTube categoryId must be numeric; 17 is Sports.
-    body["snippet"]["categoryId"]="17"
+    # YouTube categoryId 17 is Sports.
     request=service.videos().insert(part="snippet,status",body=body,
       media_body=MediaFileUpload(video_path,chunksize=-1,resumable=True))
     response=request.execute()
