@@ -50,11 +50,10 @@ class MainActivity : ComponentActivity() {
                     scriptKey = prefs.getString("apinex_script_key", "") ?: "",
                     voiceKey = prefs.getString("apinex_voice_key", "") ?: "",
                     voiceModel = prefs.getString("apinex_voice_model", "aura-2-thalia-en") ?: "aura-2-thalia-en",
-                    voiceId = prefs.getString("apinex_voice_id", "") ?: "",
                     onSaveScriptKey = { prefs.edit().putString("apinex_script_key", it.trim()).apply() },
                     onSaveVoiceKey = { prefs.edit().putString("apinex_voice_key", it.trim()).apply() },
                     onSaveVoiceModel = { prefs.edit().putString("apinex_voice_model", it.trim()).apply() },
-                    onSaveVoiceId = { prefs.edit().putString("apinex_voice_id", it.trim()).apply() }
+
                 )
             }
         }
@@ -63,9 +62,9 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun StudioHome(
-    scriptKey: String, voiceKey: String, voiceModel: String, voiceId: String,
+    scriptKey: String, voiceKey: String, voiceModel: String,
     onSaveScriptKey: (String) -> Unit, onSaveVoiceKey: (String) -> Unit,
-    onSaveVoiceModel: (String) -> Unit, onSaveVoiceId: (String) -> Unit
+    onSaveVoiceModel: (String) -> Unit
 ) {
     var match by remember { mutableStateOf("") }
     var iccUrl by remember { mutableStateOf("https://www.icc-cricket.com/tournaments/icc-women-s-emerging-nations-trophy-2026/matches/275635/zimbabwe-vs-pakistan") }
@@ -91,7 +90,6 @@ private fun StudioHome(
     var scriptKeySaved by remember { mutableStateOf(scriptKey.isNotBlank()) }
     var voiceKeySaved by remember { mutableStateOf(voiceKey.isNotBlank()) }
     var ttsModelInput by remember { mutableStateOf("") }
-    var ttsVoiceInput by remember { mutableStateOf("") }
     var activeTtsModel by remember { mutableStateOf(voiceModel) }
     var activeTtsVoice by remember { mutableStateOf(voiceId) }
     var notice by remember { mutableStateOf("Ready to configure your production studio.") }
@@ -252,19 +250,7 @@ private fun StudioHome(
                     modifier = Modifier.fillMaxWidth(), singleLine = true
                 )
                 Text("Current TTS model: $activeTtsModel", color = Gold, style = MaterialTheme.typography.bodySmall)
-                OutlinedTextField(
-                    value = ttsVoiceInput,
-                    onValueChange = { entered ->
-                        ttsVoiceInput = entered
-                        activeTtsVoice = entered.trim()
-                        onSaveVoiceId(entered)
-                        notice = if (entered.isBlank()) "Using the TTS model's default voice." else "APInex voice ID saved."
-                    },
-                    label = { Text("Presenter voice ID (optional)") },
-                    placeholder = { Text("Enter a voice ID supported by your selected model") },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true
-                )
-                Text("Leave voice ID blank to use the selected model's default voice. Check APInex model documentation for valid model and voice IDs. Voice is converted locally to WAV.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+                Text("Choose a supported APInex TTS model ID. APInex currently documents Aura-2 voices; the model ID selects the voice. Voice is converted locally to WAV.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
             }
         }
         Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
@@ -326,8 +312,7 @@ private fun StudioHome(
                                         }
                                         val minutes = duration.substringBefore(" ").toIntOrNull() ?: 5
                                         val selectedTtsModel = ttsModelInput.trim().ifBlank { activeTtsModel }
-                                        val selectedTtsVoice = ttsVoiceInput.trim().ifBlank { activeTtsVoice }
-                                        val apinex = ApinexClient(textKey, speechKey, ttsModel = selectedTtsModel, ttsVoice = selectedTtsVoice)
+                                        val apinex = ApinexClient(textKey, speechKey, ttsModel = selectedTtsModel)
                                         val script = apinex.createScript(match, format, minutes, report.toPromptContext())
                                         LocalProjectStore(context).saveScript(project, match, format, script)
                                         notice = "STAGE 1/3 COMPLETE — research and script saved. STAGE 2/3 — generating APInex presenter voice…"
