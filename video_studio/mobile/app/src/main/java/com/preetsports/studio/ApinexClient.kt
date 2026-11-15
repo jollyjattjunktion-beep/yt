@@ -6,6 +6,7 @@ import com.fasterxml.jackson.core.JsonFactory
 import com.fasterxml.jackson.core.JsonToken
 import com.fasterxml.jackson.core.Base64Variants
 import java.io.RandomAccessFile
+import android.os.Debug
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -99,13 +100,15 @@ class ApinexClient(
                 .getString("content").trim().also { require(it.isNotBlank()) { "APInex returned an empty script." } }
         }
 
-    private fun postAudioToFile(url: String, key: String, payload: JSONObject, target: File): Long {
+    private fun postAudioToFile(url: String, key: String, payload: JSONObject, target: File, diagnostic: File): Long {
         val req = Request.Builder().url(url)
             .header("Authorization", "Bearer $key")
             .header("Content-Type", "application/json")
             .post(payload.toString().toRequestBody("application/json".toMediaType()))
             .build()
+        diagnostic.appendText("HTTP request started; heapUsed=${Debug.getNativeHeapAllocatedSize()}; maxHeap=${Runtime.getRuntime().maxMemory()}\n")
         http.newCall(req).execute().use { response ->
+            diagnostic.appendText("HTTP headers received; status=${response.code}; contentLength=${response.body?.contentLength()}; contentType=${response.header("Content-Type")}\n")
             if (!response.isSuccessful) {
                 val detail = response.body?.string().orEmpty().take(450)
                 error(when (response.code) {
@@ -116,6 +119,7 @@ class ApinexClient(
             }
             val body = response.body ?: error("APInex returned an empty voice response.")
             var decoded = 0L
+            diagnostic.appendText("Beginning streamed JSON audio decode\n")
             body.byteStream().use { input ->
                 JsonFactory().createParser(input).use { parser ->
                     while (parser.nextToken() != null) {
@@ -126,12 +130,14 @@ class ApinexClient(
                             target.outputStream().use { output ->
                                 decoded = parser.readBinaryValue(Base64Variants.getDefaultVariant(), output).toLong()
                             }
+                            diagnostic.appendText("Base64 audio decoded: $decoded bytes; heapUsed=${Debug.getNativeHeapAllocatedSize()}\n")
                             break
                         }
                     }
                 }
             }
             require(decoded > 100) { "APInex TTS response did not contain usable audio_base64 data." }
+            diagnostic.appendText("Audio response parse completed\n")
             return decoded
         }
     }
@@ -141,7 +147,7 @@ class ApinexClient(
             require(voiceApiKey.isNotBlank()) { "Add your APInex Presenter Voice API key in the relevant APInex setting." }
             require(ttsModel.isNotBlank()) { "Enter an APInex TTS model ID in Voice settings." }
             require(script.isNotBlank()) { "Script is empty; generate the script before voice." }
-            val chunks = splitForTts(script, 320)
+            val chunks = splitForTts(script, 120)
             val parent = outputWav.parentFile ?: error("Voice output folder is unavailable.")
             parent.mkdirs()
             val segmentDir = File(parent, "apinex-voice-segments").apply { mkdirs() }
@@ -155,7 +161,7 @@ class ApinexClient(
                 segmentDir.listFiles()?.forEach { it.delete() }
                 manifest.writeText(signature)
             }
-            diagnostic.writeText("Starting voice generation. Model=$ttsModel; chunks=${chunks.size}; scriptChars=${script.length}\n")
+            diagnostic.writeText("Starting voice generation. Model=$ttsModel; chunks=${chunks.size}; scriptChars=${script.length}; maxHeap=${Runtime.getRuntime().maxMemory()}; freeHeap=${Runtime.getRuntime().freeMemory()}\n")
             var totalPcmBytes = 0L
             chunks.forEachIndexed { index, chunk ->
                 val mp3 = File(segmentDir, "segment-%03d.mp3".format(index + 1))
@@ -163,12 +169,13 @@ class ApinexClient(
                 diagnostic.appendText("Segment ${index + 1}/${chunks.size}: begin; existingPcm=${pcm.length()}\n")
                 if (!pcm.isFile || pcm.length() <= 100) {
                     if (!mp3.isFile || mp3.length() <= 100) {
+                        diagnostic.appendText("Segment ${index + 1}: preparing request; textChars=${chunk.length}\n")
                         onProgress("APInex voice request ${index + 1}/${chunks.size}…")
                         val payload = JSONObject()
                             .put("text", "Read this Roman Hinglish cricket presenter script verbatim. Warm, energetic sports presenter delivery. Do not translate or paraphrase. $chunk")
                             .put("model", ttsModel)
                             .put("encoding", "mp3")
-                        val downloadedBytes = postAudioToFile("https://api.apinex.bond/v1/tools/voice/tts", voiceApiKey, payload, mp3)
+                        val downloadedBytes = postAudioToFile("https://api.apinex.bond/v1/tools/voice/tts", voiceApiKey, payload, mp3, diagnostic)
                     diagnostic.appendText("Segment ${index + 1}: downloaded $downloadedBytes bytes\n")
                     } else {
                         onProgress("Reusing downloaded voice segment ${index + 1}/${chunks.size}…")
