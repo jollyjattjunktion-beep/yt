@@ -58,13 +58,23 @@ class GeminiClient(private val apiKey: String) {
             val response = post(model, JSONObject().put("contents", contents).put("generationConfig", config))
             val inline = response.getJSONArray("candidates").getJSONObject(0).getJSONObject("content")
                 .getJSONArray("parts").getJSONObject(0).getJSONObject("inlineData")
-            val bytes = Base64.decode(inline.getString("data"), Base64.DEFAULT)
+            val providerBytes = Base64.decode(inline.getString("data"), Base64.DEFAULT)
+            val mime = inline.optString("mimeType", "audio/L16;rate=24000")
             output.parentFile?.mkdirs()
-            // Gemini TTS commonly returns 24 kHz, 16-bit mono PCM. Preserve provider bytes and MIME
-            // metadata so a later decoder can select the correct sample format.
-            File(output.parentFile, "voiceover.pcm").writeBytes(bytes)
-            File(output.parentFile, "voiceover-mime.txt").writeText(inline.optString("mimeType", "audio/L16;rate=24000"))
-            output.writeBytes(wavHeader(bytes.size, 24000, 1, 16) + bytes)
+            File(output.parentFile, "voiceover-provider.pcm").writeBytes(providerBytes)
+            File(output.parentFile, "voiceover-mime.txt").writeText(mime)
+            // L16 is signed 16-bit big-endian PCM; RIFF/WAVE PCM is little-endian.
+            val bytes = if (mime.contains("L16", ignoreCase = true)) {
+                ByteArray(providerBytes.size).also { dst ->
+                    var i = 0
+                    while (i + 1 < providerBytes.size) {
+                        dst[i] = providerBytes[i + 1]; dst[i + 1] = providerBytes[i]; i += 2
+                    }
+                    if (i < providerBytes.size) dst[i] = providerBytes[i]
+                }
+            } else providerBytes
+            val rate = Regex("rate=(\\d+)", RegexOption.IGNORE_CASE).find(mime)?.groupValues?.get(1)?.toIntOrNull() ?: 24000
+            output.writeBytes(wavHeader(bytes.size, rate, 1, 16) + bytes)
             output
         }
 
