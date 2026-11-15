@@ -42,7 +42,7 @@ class GeminiClient(private val apiKey: String) {
             clearly say they are not verified and focus on conditional tactical analysis. Output only the script.
         """.trimIndent()
         val contents = JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", prompt))))
-        val response = post("gemini-2.5-flash", JSONObject().put("contents", contents))
+        val response = post("gemini-3.8-flash", JSONObject().put("contents", contents))
         response.getJSONArray("candidates").getJSONObject(0).getJSONObject("content")
             .getJSONArray("parts").getJSONObject(0).getString("text").trim()
     }
