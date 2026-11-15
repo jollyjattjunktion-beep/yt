@@ -1,20 +1,21 @@
 import asyncio, uuid
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from fastapi.responses import FileResponse
 from .config import settings
 from .schemas import MatchRequest
 from .research import research_match
 from .scriptwriter import generate_script
 from .renderer import render_video, safe_name
+from .publishing import upload_video
 
 app=FastAPI(title=settings.app_name,version="0.1.0")
 JOBS: dict[str,dict] = {}
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
 def home():
-    return {"name":settings.app_name,"status":"running","docs":"/docs",
-            "note":"Configure cricket-data provider and Gemini key for sourced research and AI-written scripts."}
+    return Path(__file__).with_name("dashboard.html").read_text(encoding="utf-8")
 
 @app.get("/health")
 def health(): return {"ok":True}
@@ -36,6 +37,13 @@ async def run_job(job_id: str, req: MatchRequest):
         JOBS[job_id]["status"]="rendering"
         folder=settings.output_dir/safe_name(req.match_name)/job_id
         result=await render_video(script,req.match_name,folder,req.voice)
+        if req.publish_to_youtube:
+            JOBS[job_id]["status"]="publishing"
+            uploads=[]
+            for video in result["videos"]:
+                upload=await asyncio.to_thread(upload_video,video,result["metadata"],req.privacy_status)
+                uploads.append(upload)
+            result["youtube_uploads"]=uploads
         JOBS[job_id].update(status="completed",result=result,research=research)
     except Exception as exc:
         JOBS[job_id].update(status="failed",error=str(exc))
