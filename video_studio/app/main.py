@@ -13,6 +13,15 @@ app=FastAPI(title=settings.app_name,version="0.2.0")
 def home():
     return Path(__file__).with_name("dashboard.html").read_text(encoding="utf-8")
 
+@app.get("/manifest.webmanifest")
+def web_manifest():
+    return FileResponse(Path(__file__).with_name("manifest.webmanifest"), media_type="application/manifest+json")
+
+@app.get("/sw.js")
+def service_worker():
+    return FileResponse(Path(__file__).with_name("sw.js"), media_type="application/javascript",
+                        headers={"Cache-Control":"no-cache", "Service-Worker-Allowed": "/"})
+
 @app.get("/health")
 def health():
     with connect() as db: db.execute("SELECT 1").fetchone()
