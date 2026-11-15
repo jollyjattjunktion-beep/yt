@@ -71,34 +71,103 @@ class GeminiClient(private val apiKey: String) {
 
     suspend fun createVoice(script: String, output: File, model: String = "gemini-3.8-flash-lite-tts", voice: String = "Charon"): File =
         withContext(Dispatchers.IO) {
-            val instruction = "Read this Roman Hinglish cricket presenter script verbatim. Use a warm, energetic, confident Indian sports presenter delivery with natural pauses. Do not translate or paraphrase.\n\n$script"
-            val parts = JSONArray().put(JSONObject().put("text", instruction))
-            val contents = JSONArray().put(JSONObject().put("role", "user").put("parts", parts))
-            val voiceConfig = JSONObject().put("prebuiltVoiceConfig", JSONObject().put("voiceName", voice))
-            val config = JSONObject().put("responseModalities", JSONArray().put("AUDIO"))
-                .put("speechConfig", JSONObject().put("voiceConfig", voiceConfig))
-            val response = post(model, JSONObject().put("contents", contents).put("generationConfig", config))
-            val inline = response.getJSONArray("candidates").getJSONObject(0).getJSONObject("content")
-                .getJSONArray("parts").getJSONObject(0).getJSONObject("inlineData")
-            val providerBytes = Base64.decode(inline.getString("data"), Base64.DEFAULT)
-            val mime = inline.optString("mimeType", "audio/L16;rate=24000")
+            require(apiKey.isNotBlank()) { "Add your Gemini API key in Settings first." }
+            require(script.isNotBlank()) { "Script is empty; generate the script before voice." }
+            val chunks = splitForSpeech(script, 850)
             output.parentFile?.mkdirs()
-            File(output.parentFile, "voiceover-provider.pcm").writeBytes(providerBytes)
-            File(output.parentFile, "voiceover-mime.txt").writeText(mime)
-            // L16 is signed 16-bit big-endian PCM; RIFF/WAVE PCM is little-endian.
-            val bytes = if (mime.contains("L16", ignoreCase = true)) {
-                ByteArray(providerBytes.size).also { dst ->
-                    var i = 0
-                    while (i + 1 < providerBytes.size) {
-                        dst[i] = providerBytes[i + 1]; dst[i + 1] = providerBytes[i]; i += 2
+            val providerFile = File(output.parentFile, "voiceover-provider.pcm")
+            val mimeFile = File(output.parentFile, "voiceover-mime.txt")
+            var sampleRate = 24000
+            var totalPcmBytes = 0L
+
+            java.io.RandomAccessFile(output, "rw").use { wav ->
+                wav.setLength(0)
+                wav.write(ByteArray(44))
+                chunks.forEachIndexed { index, chunk ->
+                    val instruction = "Read this Roman Hinglish cricket presenter script verbatim. Use a warm, energetic, confident Indian sports presenter delivery with natural pauses. Do not translate or paraphrase. This is part \${index + 1} of \${chunks.size}; continue naturally.\n\n$chunk"
+                    val parts = JSONArray().put(JSONObject().put("text", instruction))
+                    val contents = JSONArray().put(JSONObject().put("role", "user").put("parts", parts))
+                    val voiceConfig = JSONObject().put("prebuiltVoiceConfig", JSONObject().put("voiceName", voice))
+                    val config = JSONObject().put("responseModalities", JSONArray().put("AUDIO"))
+                        .put("speechConfig", JSONObject().put("voiceConfig", voiceConfig))
+                    val response = post(model, JSONObject().put("contents", contents).put("generationConfig", config))
+                    val responseParts = response.getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts")
+                    val inline = (0 until responseParts.length()).asSequence()
+                        .map { responseParts.getJSONObject(it) }
+                        .firstOrNull { it.has("inlineData") }
+                        ?.getJSONObject("inlineData")
+                        ?: error("Gemini returned no audio for voice segment \${index + 1}.")
+                    val mime = inline.optString("mimeType", "audio/L16;rate=24000")
+                    val rate = Regex("rate=(\\d+)", RegexOption.IGNORE_CASE).find(mime)?.groupValues?.get(1)?.toIntOrNull() ?: 24000
+                    if (index == 0) {
+                        sampleRate = rate
+                        mimeFile.writeText(mime)
+                        providerFile.writeBytes(ByteArray(0))
+                    } else require(rate == sampleRate) { "Gemini changed audio sample rate between voice segments." }
+
+                    val pcm = Base64.decode(inline.getString("data"), Base64.DEFAULT)
+                    if (mime.contains("L16", ignoreCase = true)) {
+                        var i = 0
+                        while (i + 1 < pcm.size) {
+                            val first = pcm[i]
+                            pcm[i] = pcm[i + 1]
+                            pcm[i + 1] = first
+                            i += 2
+                        }
                     }
-                    if (i < providerBytes.size) dst[i] = providerBytes[i]
+                    wav.seek(44L + totalPcmBytes)
+                    wav.write(pcm)
+                    totalPcmBytes += pcm.size
+                    providerFile.appendBytes(pcm)
                 }
-            } else providerBytes
-            val rate = Regex("rate=(\\d+)", RegexOption.IGNORE_CASE).find(mime)?.groupValues?.get(1)?.toIntOrNull() ?: 24000
-            output.writeBytes(wavHeader(bytes.size, rate, 1, 16) + bytes)
+                require(totalPcmBytes > 0) { "Gemini returned an empty voice recording." }
+                require(totalPcmBytes <= 0xffffffffL - 36L) { "Voice recording is too large for standard WAV." }
+                wav.seek(0)
+                wav.write(wavHeader(totalPcmBytes.toInt(), sampleRate, 1, 16))
+                wav.fd.sync()
+            }
             output
         }
+
+    private fun splitForSpeech(text: String, maxChars: Int): List<String> {
+        val paragraphs = text.replace("\r\n", "\n").split(Regex("\n{2,}"))
+            .map { it.trim() }.filter { it.isNotBlank() }
+        val result = mutableListOf<String>()
+        val current = StringBuilder()
+        fun flush() {
+            if (current.isNotEmpty()) {
+                result += current.toString().trim()
+                current.setLength(0)
+            }
+        }
+        paragraphs.forEach { paragraph ->
+            if (paragraph.length <= maxChars) {
+                if (current.isNotEmpty() && current.length + paragraph.length + 2 > maxChars) flush()
+                if (current.isNotEmpty()) current.append("\n\n")
+                current.append(paragraph)
+            } else {
+                flush()
+                paragraph.split(Regex("(?<=[.!?।])\\s+")).forEach { sentence ->
+                    if (sentence.length > maxChars) {
+                        var remaining = sentence
+                        while (remaining.length > maxChars) {
+                            val cut = remaining.lastIndexOf(' ', maxChars).takeIf { it > maxChars / 2 } ?: maxChars
+                            result += remaining.substring(0, cut).trim()
+                            remaining = remaining.substring(cut).trim()
+                        }
+                        if (remaining.isNotBlank()) result += remaining
+                    } else {
+                        if (current.isNotEmpty() && current.length + sentence.length + 1 > maxChars) flush()
+                        if (current.isNotEmpty()) current.append(' ')
+                        current.append(sentence)
+                    }
+                }
+                flush()
+            }
+        }
+        flush()
+        return result
+    }
 
     private fun wavHeader(dataSize: Int, sampleRate: Int, channels: Int, bits: Int): ByteArray {
         val byteRate = sampleRate * channels * bits / 8
