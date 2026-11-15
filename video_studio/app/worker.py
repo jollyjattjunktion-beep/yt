@@ -1,5 +1,5 @@
 """Standalone local worker. Run with: python -m app.worker"""
-import asyncio, json, time, traceback
+import asyncio, traceback
 from .job_store import next_job, update_job, recover_interrupted
 from .schemas import MatchRequest
 from .research import research_match
@@ -15,9 +15,9 @@ async def process(job):
         research=await research_match(req.match_name,req.match_facts)
         update_job(job_id,stage="Writing Roman Hinglish script",progress=22)
         script=await generate_script(req.match_name,research,req.duration_minutes,req.language)
-        update_job(job_id,stage="Generating Gemini voice and video scenes",progress=38)
+        update_job(job_id,stage="Generating Gemini voice, graphics and videos",progress=38)
         folder=settings.output_dir/safe_name(req.match_name)/job_id
-        result=await render_video(script,req.match_name,folder,req.voice)
+        result=await render_video(script,req.match_name,folder,req.voice,research=research)
         update_job(job_id,status="completed",stage="Production complete",progress=100,result={"research":research,**result})
     except Exception as exc:
         update_job(job_id,status="failed",stage="Production failed",error=str(exc))
