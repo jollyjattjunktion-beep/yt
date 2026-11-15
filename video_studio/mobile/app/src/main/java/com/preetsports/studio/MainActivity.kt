@@ -207,6 +207,6 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
             }
         }
         Text(notice, color = Gold)
-        Text("On-device Gemini script and voice · Video renderer integration in progress", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+        Text("On-device Gemini script & voice · photo-led match graphics · animated 8 fps MP4 export", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
     }
 }
