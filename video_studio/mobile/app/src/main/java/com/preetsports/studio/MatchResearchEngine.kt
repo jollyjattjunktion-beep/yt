@@ -51,8 +51,12 @@ data class MatchResearchReport(
 }
 
 class MatchResearchEngine(private val importer: MatchUrlImporter = MatchUrlImporter()) {
-    suspend fun research(iccUrl: String, cricbuzzUrl: String): MatchResearchReport {
-        val raw = importer.import(iccUrl, cricbuzzUrl)
+    suspend fun research(iccUrl: String, cricbuzzUrl: String, pitchSourceUrl: String = "", h2hSourceUrl: String = ""): MatchResearchReport {
+        val base = importer.import(iccUrl, cricbuzzUrl)
+        val supplements = mutableListOf<MatchSourcePage>()
+        if (pitchSourceUrl.isNotBlank()) supplements += importer.fetchTrustedSupplementary(pitchSourceUrl, "Pitch source")
+        if (h2hSourceUrl.isNotBlank()) supplements += importer.fetchTrustedSupplementary(h2hSourceUrl, "H2H source")
+        val raw = base.copy(pages = base.pages + supplements)
         val facts = mutableListOf<EvidenceFact>()
         val conflicts = mutableListOf<String>()
         val missing = mutableListOf<String>()
@@ -89,8 +93,23 @@ class MatchResearchEngine(private val importer: MatchUrlImporter = MatchUrlImpor
         raw.pages.forEach { page -> page.imageLinks.forEach { (alt, url) ->
             if (imageMap.size < 80) imageMap["${page.source}: $alt"] = url
         } }
-        missing += "Pitch report (requires a venue-specific trusted report; not inferred from fixture page)"
-        missing += "Head-to-head record (requires a verified historical score source)"
+        val pitchPages = raw.pages.filter { it.source == "Pitch source" || it.url.contains("pitch", true) }
+        val pitchEvidence = pitchPages.flatMap { page ->
+            Regex("(?i)(?:pitch|surface|toss|weather|dew|conditions)[^.!?]{0,220}[.!?]?")
+                .findAll(page.extractedText).map { it.value.trim() }.toList().take(12)
+                .map { EvidenceFact("Pitch and conditions", it, page.url, it, "MEDIUM") }
+        }
+        facts += pitchEvidence
+        if (pitchEvidence.isEmpty()) missing += "Pitch report: no venue-specific pitch evidence was extracted; supply an official ground/board or trusted match preview URL."
+
+        val h2hPages = raw.pages.filter { it.source == "H2H source" || it.url.contains("head-to-head", true) || it.url.contains("h2h", true) }
+        val h2hEvidence = h2hPages.flatMap { page ->
+            Regex("(?i)(?:head.to.head|overall|played|won|wins|drawn|tied|last meeting)[^.!?]{0,180}[.!?]?")
+                .findAll(page.extractedText).map { it.value.trim() }.toList().take(12)
+                .map { EvidenceFact("Head to head", it, page.url, it, "MEDIUM") }
+        }
+        facts += h2hEvidence
+        if (h2hEvidence.isEmpty()) missing += "Head-to-head: no historical result evidence was extracted; supply a trusted series/results or stats URL."
         missing += "Player names and portrait identity matching (image URLs are candidates only until matched to official squad names)"
         return MatchResearchReport(raw.matchTitle, facts.distinctBy { "${it.field}|${it.value}|${it.source}" },
             raw.pages.map { it.url }.distinct(), imageMap, conflicts.distinct(), missing.distinct())
