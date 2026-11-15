@@ -21,3 +21,9 @@ class Settings(BaseSettings):
 settings = Settings()
 settings.output_dir.mkdir(parents=True, exist_ok=True)
 settings.data_dir.mkdir(parents=True, exist_ok=True)
+
+def reload_settings():
+    """Refresh credentials saved from the local dashboard without restarting the worker."""
+    fresh=Settings()
+    for key,value in fresh.__dict__.items():
+        setattr(settings,key,value)
