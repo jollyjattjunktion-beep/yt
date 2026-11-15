@@ -145,7 +145,7 @@ class ApinexClient(
             val parent = outputWav.parentFile ?: error("Voice output folder is unavailable.")
             parent.mkdirs()
             val segmentDir = File(parent, "apinex-voice-segments").apply { mkdirs() }
-            val pcmFile = File(parent, "voiceover-combined.pcm")
+            val diagnostic = File(parent, "voice-generation-diagnostics.txt")
             val tempMp3 = File(parent, "voice-segment-current.mp3")
             val tempPcm = File(parent, "voice-segment-current.pcm")
             // Resume only if the saved manifest matches this exact script and selected model.
@@ -153,14 +153,14 @@ class ApinexClient(
             val manifest = File(segmentDir, "manifest.txt")
             if (!manifest.isFile || manifest.readText() != signature) {
                 segmentDir.listFiles()?.forEach { it.delete() }
-                pcmFile.delete()
                 manifest.writeText(signature)
             }
-            pcmFile.outputStream().use { /* create/truncate only for a fresh run */ }
+            diagnostic.writeText("Starting voice generation. Model=$ttsModel; chunks=${chunks.size}; scriptChars=${script.length}\n")
             var totalPcmBytes = 0L
             chunks.forEachIndexed { index, chunk ->
                 val mp3 = File(segmentDir, "segment-%03d.mp3".format(index + 1))
                 val pcm = File(segmentDir, "segment-%03d.pcm".format(index + 1))
+                diagnostic.appendText("Segment ${index + 1}/${chunks.size}: begin; existingPcm=${pcm.length()}\n")
                 if (!pcm.isFile || pcm.length() <= 100) {
                     if (!mp3.isFile || mp3.length() <= 100) {
                         onProgress("APInex voice request ${index + 1}/${chunks.size}…")
@@ -168,7 +168,8 @@ class ApinexClient(
                             .put("text", "Read this Roman Hinglish cricket presenter script verbatim. Warm, energetic sports presenter delivery. Do not translate or paraphrase. $chunk")
                             .put("model", ttsModel)
                             .put("encoding", "mp3")
-                        postAudioToFile("https://api.apinex.bond/v1/tools/voice/tts", voiceApiKey, payload, mp3)
+                        val downloadedBytes = postAudioToFile("https://api.apinex.bond/v1/tools/voice/tts", voiceApiKey, payload, mp3)
+                    diagnostic.appendText("Segment ${index + 1}: downloaded $downloadedBytes bytes\n")
                     } else {
                         onProgress("Reusing downloaded voice segment ${index + 1}/${chunks.size}…")
                     }
@@ -185,10 +186,12 @@ class ApinexClient(
                         error("Voice segment ${index + 1} conversion failed: ${session.allLogsAsString.takeLast(500)}")
                     }
                     tempPcm.copyTo(pcm, overwrite = true)
+                    diagnostic.appendText("Segment ${index + 1}: converted PCM ${pcm.length()} bytes\n")
                     tempMp3.delete()
                     tempPcm.delete()
                 }
                 totalPcmBytes += pcm.length()
+                diagnostic.appendText("Segment ${index + 1}: complete; cumulativePcm=$totalPcmBytes\n")
                 onProgress("Voice segment ${index + 1}/${chunks.size} complete.")
             }
             // Build the final WAV sequentially from small on-disk PCM segments.
@@ -217,7 +220,7 @@ class ApinexClient(
                 wav.seek(40); writeLeInt(wav, dataSize.toInt())
             }
             require(outputWav.isFile && outputWav.length() > 44) { "Final presenter WAV could not be created." }
-            pcmFile.delete()
+            diagnostic.appendText("WAV complete: ${outputWav.length()} bytes\n")
             outputWav
         }
 
