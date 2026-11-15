@@ -65,6 +65,7 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
     var stageOneDone by remember { mutableStateOf(false) }
     var stageTwoDone by remember { mutableStateOf(false) }
     var stageThreeDone by remember { mutableStateOf(false) }
+    var researchProjectPath by remember { mutableStateOf("") }
     var format by remember { mutableStateOf("T20") }
     var duration by remember { mutableStateOf("5 minutes") }
     var apiKey by remember { mutableStateOf("") }
@@ -136,6 +137,7 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                                 importedResearch = raw
                                 if (match.isBlank()) match = research.matchTitle
                                 val project = LocalProjectStore(context).createProject(match)
+                                researchProjectPath = project.absolutePath
                                 research.save(java.io.File(project, "research-report.json"))
                                 java.io.File(project, "match-research.txt").writeText(research.toPromptContext())
                                 java.io.File(project, "research-project-path.txt").writeText(project.absolutePath)
@@ -203,7 +205,8 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                                 scope.launch {
                                     try {
                                         val key = if (apiKey.isNotBlank()) apiKey.trim() else activeKey
-                                        val project = LocalProjectStore(context).createProject(match)
+                                        val project = if (researchProjectPath.isNotBlank() && java.io.File(researchProjectPath).isDirectory)
+                                            java.io.File(researchProjectPath) else LocalProjectStore(context).createProject(match)
                                         val report = researchReport ?: MatchResearchEngine().research(iccUrl, cricbuzzUrl).also {
                                             researchReport = it
                                             it.save(java.io.File(project, "research-report.json"))
@@ -226,10 +229,6 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                                         }
                                         val minutes = duration.substringBefore(" ").toIntOrNull() ?: 5
                                         val gemini = GeminiClient(key)
-                                        val research = importedResearch
-                                        if (research != null) {
-                                            java.io.File(project, "match-research.txt").writeText(research.toPromptContext())
-                                        }
                                         val script = gemini.createScript(match, format, minutes, report.toPromptContext())
                                         LocalProjectStore(context).saveScript(project, match, format, script)
                                         notice = "STAGE 1/3 COMPLETE — research and full script saved. STAGE 2/3 — generating presenter voice…"
@@ -254,9 +253,6 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                                             notice = "Rendering vertical video: $p%"
                                         }
                                         renderer.publishToMovies(vertical.file)
-                                        val job = StudioJob(project.name, match, format, minutes, "completed", 100,
-                                            "Both MP4 formats exported to Movies/Preet Sports", project.absolutePath)
-                                        StudioJobStore(context).save(job)
                                         stageTwoDone = true
                                         notice = "STAGE 2/3 COMPLETE — both videos exported. STAGE 3/3 — generating thumbnails and YouTube metadata…"
                                         val packageFiles = YouTubePackageBuilder().build(project, match, format, script, scenes)
