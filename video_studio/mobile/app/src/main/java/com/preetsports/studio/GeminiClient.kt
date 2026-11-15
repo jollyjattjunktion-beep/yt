@@ -52,9 +52,9 @@ class GeminiClient(private val apiKey: String) {
             val instruction = "Read this Roman Hinglish cricket presenter script verbatim. Use a warm, energetic, confident Indian sports presenter delivery with natural pauses. Do not translate or paraphrase.\n\n$script"
             val parts = JSONArray().put(JSONObject().put("text", instruction))
             val contents = JSONArray().put(JSONObject().put("role", "user").put("parts", parts))
-            val speech = JSONObject().put("voiceConfig", JSONObject().put("prebuiltVoiceConfig", JSONObject().put("voiceName", voice)))
+            val voiceConfig = JSONObject().put("prebuiltVoiceConfig", JSONObject().put("voiceName", voice))
             val config = JSONObject().put("responseModalities", JSONArray().put("AUDIO"))
-                .put("speechConfig", JSONObject().put("voiceConfig", speech))
+                .put("speechConfig", JSONObject().put("voiceConfig", voiceConfig))
             val response = post(model, JSONObject().put("contents", contents).put("generationConfig", config))
             val inline = response.getJSONArray("candidates").getJSONObject(0).getJSONObject("content")
                 .getJSONArray("parts").getJSONObject(0).getJSONObject("inlineData")
