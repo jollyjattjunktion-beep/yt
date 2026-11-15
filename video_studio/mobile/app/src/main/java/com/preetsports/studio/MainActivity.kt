@@ -72,6 +72,7 @@ private fun StudioHome(
     var pitchSourceUrl by remember { mutableStateOf("") }
     var h2hSourceUrl by remember { mutableStateOf("") }
     var playerNames by remember { mutableStateOf("") }
+    var scriptText by remember { mutableStateOf("") }
     var portraitStatus by remember { mutableStateOf("") }
     var youtubeAccessToken by remember { mutableStateOf("") }
     var completedProjectPath by remember { mutableStateOf("") }
@@ -254,7 +255,50 @@ private fun StudioHome(
         }
         Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("04 · Optional match photos", color = Gold, fontWeight = FontWeight.Bold)
+                Text("04 · Generate and review script", color = Gold, fontWeight = FontWeight.Bold)
+                Text("Generate the Roman Hinglish script separately, review or edit it, then run voice and video production. The script is saved in the project folder.", color = Color.LightGray)
+                Button(
+                    enabled = !busy && match.isNotBlank() && (scriptKeySaved || scriptApiKey.isNotBlank()),
+                    onClick = {
+                        busy = true
+                        notice = "Generating Roman Hinglish script with APInex…"
+                        scope.launch {
+                            try {
+                                val key = scriptApiKey.trim().ifBlank { activeScriptKey }
+                                val project = if (researchProjectPath.isNotBlank() && java.io.File(researchProjectPath).isDirectory)
+                                    java.io.File(researchProjectPath) else LocalProjectStore(context).createProject(match)
+                                val report = researchReport ?: MatchResearchEngine().research(iccUrl, cricbuzzUrl, pitchSourceUrl, h2hSourceUrl).also {
+                                    researchReport = it
+                                    it.save(java.io.File(project, "research-report.json"))
+                                    java.io.File(project, "match-research.txt").writeText(it.toPromptContext())
+                                }
+                                researchProjectPath = project.absolutePath
+                                val minutes = duration.substringBefore(" ").toIntOrNull() ?: 5
+                                val generated = ApinexClient(key, key, ttsModel = activeTtsModel)
+                                    .createScript(match, format, minutes, report.toPromptContext())
+                                scriptText = generated
+                                LocalProjectStore(context).saveScript(project, match, format, generated)
+                                notice = "Script generated and saved. Review or edit it below before voice generation."
+                            } catch (e: Exception) {
+                                notice = "Script generation failed: ${e.message ?: "Unknown error"}"
+                            } finally { busy = false }
+                        }
+                    }, modifier = Modifier.fillMaxWidth()
+                ) { Text(if (busy) "Generating script…" else "Generate Roman Hinglish script") }
+                OutlinedTextField(
+                    value = scriptText,
+                    onValueChange = { scriptText = it },
+                    label = { Text("Generated script — review/edit before voice") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 8,
+                    maxLines = 18
+                )
+                Text(if (scriptText.isNotBlank()) "${scriptText.trim().split(Regex("\\s+")).size} words · script ready" else "No script generated yet.", color = if (scriptText.isNotBlank()) Gold else Color.LightGray)
+            }
+        }
+        Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("05 · Optional match photos", color = Gold, fontWeight = FontWeight.Bold)
                 Text("Select up to 14 images in this order: venue, home-team, away-team, then player portraits.", color = Color.LightGray)
                 OutlinedButton(
                     onClick = { photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
@@ -266,7 +310,7 @@ private fun StudioHome(
         }
         Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("03 · Stages 2 and 3 — Video & YouTube package", color = Gold, fontWeight = FontWeight.Bold)
+                Text("06 · Stages 2 and 3 — Video & YouTube package", color = Gold, fontWeight = FontWeight.Bold)
                 Text("Stage 1: research + script  ·  Stage 2: voice + 16:9/9:16 MP4  ·  Stage 3: thumbnails + metadata + ZIP package", color = Color.LightGray)
                 Text("05 · Production modules", color = Gold, fontWeight = FontWeight.Bold)
                 listOf("Roman Hinglish commentary", "APInex presenter voice", "Stadium and team graphics", "Player cards and pitch report", "Head-to-head and match analysis", "9:16 and 16:9 video exports").forEach {
@@ -312,7 +356,7 @@ private fun StudioHome(
                                         val minutes = duration.substringBefore(" ").toIntOrNull() ?: 5
                                         val selectedTtsModel = ttsModelInput.trim().ifBlank { activeTtsModel }
                                         val apinex = ApinexClient(textKey, speechKey, ttsModel = selectedTtsModel)
-                                        val script = apinex.createScript(match, format, minutes, report.toPromptContext())
+                                        val script = scriptText.ifBlank { apinex.createScript(match, format, minutes, report.toPromptContext()) }.also { scriptText = it }
                                         LocalProjectStore(context).saveScript(project, match, format, script)
                                         notice = "STAGE 1/3 COMPLETE — research and script saved. STAGE 2/3 — generating APInex presenter voice…"
                                         val audio = apinex.createVoice(script, java.io.File(project, "voiceover.wav")) { progress ->
