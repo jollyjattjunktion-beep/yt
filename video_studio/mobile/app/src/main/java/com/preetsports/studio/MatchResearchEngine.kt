@@ -1,0 +1,98 @@
+package com.preetsports.studio
+
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+
+data class EvidenceFact(
+    val field: String,
+    val value: String,
+    val source: String,
+    val evidence: String,
+    val confidence: String
+)
+
+data class MatchResearchReport(
+    val matchTitle: String,
+    val facts: List<EvidenceFact>,
+    val sourceUrls: List<String>,
+    val imageCandidates: Map<String, String>,
+    val conflicts: List<String>,
+    val missing: List<String>
+) {
+    fun toPromptContext(): String = buildString {
+        appendLine("SOURCE-CHECKED MATCH RESEARCH REPORT")
+        facts.forEach { f ->
+            appendLine("- ${f.field}: ${f.value} [${f.confidence}]")
+            appendLine("  Source: ${f.source}")
+            appendLine("  Evidence: ${f.evidence}")
+        }
+        conflicts.forEach { appendLine("CONFLICT: $it") }
+        missing.forEach { appendLine("NOT VERIFIED: $it") }
+        appendLine("SOURCE URLS:")
+        sourceUrls.forEach { appendLine("- $it") }
+        appendLine("IMAGE CANDIDATES (alt text -> source URL; not yet identity-verified):")
+        imageCandidates.forEach { (alt, url) -> appendLine("- $alt -> $url") }
+        appendLine("Use only facts marked HIGH or MEDIUM as factual claims. State low-confidence or missing facts as unverified.")
+    }
+
+    fun save(file: File) {
+        val root = JSONObject()
+            .put("matchTitle", matchTitle)
+            .put("facts", JSONArray().apply { facts.forEach { put(JSONObject()
+                .put("field",it.field).put("value",it.value).put("source",it.source)
+                .put("evidence",it.evidence).put("confidence",it.confidence)) } })
+            .put("sources", JSONArray(sourceUrls))
+            .put("imageCandidates", JSONObject(imageCandidates))
+            .put("conflicts", JSONArray(conflicts))
+            .put("missing", JSONArray(missing))
+        file.writeText(root.toString(2))
+    }
+}
+
+class MatchResearchEngine(private val importer: MatchUrlImporter = MatchUrlImporter()) {
+    suspend fun research(iccUrl: String, cricbuzzUrl: String): MatchResearchReport {
+        val raw = importer.import(iccUrl, cricbuzzUrl)
+        val facts = mutableListOf<EvidenceFact>()
+        val conflicts = mutableListOf<String>()
+        val missing = mutableListOf<String>()
+
+        fun collect(field: String, pattern: Regex) {
+            val found = raw.pages.mapNotNull { page ->
+                pattern.find(page.extractedText)?.let { match ->
+                    val value = match.groupValues.getOrNull(1)?.trim()?.take(180).orEmpty()
+                    if (value.isBlank()) null else Triple(page, value, match.value.take(240))
+                }
+            }
+            if (found.isEmpty()) { missing += field; return }
+            val distinct = found.map { it.second }.distinctBy { it.lowercase() }
+            if (distinct.size > 1) conflicts += "$field differs between supplied pages: " + distinct.joinToString(" / ")
+            found.forEach { (page, value, evidence) ->
+                facts += EvidenceFact(field, value, page.url, evidence,
+                    if (distinct.size == 1 && found.size >= 2) "HIGH" else if (page.source == "ICC" || page.source == "Cricbuzz") "MEDIUM" else "LOW")
+            }
+        }
+        collect("Venue", Regex("Venue\\s*:?\\s*([^•|]{3,100})", RegexOption.IGNORE_CASE))
+        collect("Match date/time", Regex("(?:Date\\s*&\\s*Time|Start\\s*Time|Match\\s*Date)\\s*:?\\s*([^•|]{3,100})", RegexOption.IGNORE_CASE))
+        collect("Tournament", Regex("(?:Tournament|Series)\\s*:?\\s*([^•|]{3,120})", RegexOption.IGNORE_CASE))
+
+        val titleFacts = raw.pages.map { it to it.title }.filter { it.second.isNotBlank() }
+        if (titleFacts.isNotEmpty()) {
+            val titles = titleFacts.map { it.second }.distinct()
+            if (titles.size > 1 && titles.none { it.equals(titles.first(), true) }) {
+                // Different page titles are expected for Info/Squads; only source match pages are compared.
+                val primary = titleFacts.filter { it.first.source == "ICC" || it.first.source == "Cricbuzz" }
+                if (primary.map { it.second.lowercase() }.distinct().size > 1) conflicts += "ICC and Cricbuzz page titles differ; confirm they refer to the same fixture."
+            }
+        }
+        val imageMap = linkedMapOf<String, String>()
+        raw.pages.forEach { page -> page.imageLinks.forEach { (alt, url) ->
+            if (imageMap.size < 80) imageMap["${page.source}: $alt"] = url
+        } }
+        missing += "Pitch report (requires a venue-specific trusted report; not inferred from fixture page)"
+        missing += "Head-to-head record (requires a verified historical score source)"
+        missing += "Player names and portrait identity matching (image URLs are candidates only until matched to official squad names)"
+        return MatchResearchReport(raw.matchTitle, facts.distinctBy { "${it.field}|${it.value}|${it.source}" },
+            raw.pages.map { it.url }.distinct(), imageMap, conflicts.distinct(), missing.distinct())
+    }
+}
