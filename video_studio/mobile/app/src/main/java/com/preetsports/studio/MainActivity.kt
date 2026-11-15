@@ -143,6 +143,12 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                     Text("DATE: ${research.dateTime ?: "Not verified"}", color = Color.LightGray)
                     Text("SQUADS: ${research.squadUrl ?: "Link not found"}", color = Color.LightGray)
                     Text("SCORECARD: ${research.scorecardUrl ?: "Link not found"}", color = Color.LightGray)
+                    val imageCount = research.pages.sumOf { it.imageLinks.size }
+                    Text("SOURCE IMAGES DISCOVERED: $imageCount", color = Gold)
+                    research.pages.forEach { page ->
+                        Text("${page.source}: ${page.imageLinks.size} image links · ${page.relatedLinks.size} related links", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Text("Image URLs are collected with their source page. Before publishing, use images whose reuse rights are confirmed.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
                     research.warnings.forEach { Text("• $it", color = Gold, style = MaterialTheme.typography.bodySmall) }
                     Text("Imported source text is retained in this project and passed to script generation.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
                 }
