@@ -19,7 +19,7 @@ const form=document.querySelector('#form'), job=document.querySelector('#job'), 
 form.addEventListener('submit',async e=>{e.preventDefault();links.innerHTML='';job.style.display='block';status.textContent='Submitting…';
 let facts={};try{facts=JSON.parse(document.querySelector('#facts').value||'{}')}catch{status.textContent='Match facts must be valid JSON.';return}
 const payload={match_name:document.querySelector('#match').value,format:document.querySelector('#format').value,duration_minutes:+document.querySelector('#duration').value,language:'Roman Hinglish',voice:document.querySelector('#voice').value,match_facts:facts,publish_to_youtube:document.querySelector('#publish').checked,privacy_status:document.querySelector('#privacy').value};
-try{const res=await fetch('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});if(!res.ok)throw new Error(await res.text());const data=await res.json();poll(data.job_id)}catch(err){status.textContent='Error: '+err.message}});
+try{const res=await fetch('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),cache:'no-store'});const raw=await res.text();let data=null;try{data=raw?JSON.parse(raw):null}catch{}if(!res.ok)throw new Error('HTTP '+res.status+': '+(raw||'empty server response'));if(!data||!data.job_id)throw new Error('Server returned empty/invalid JSON or no job ID. '+(raw||'No response body.'));poll(data.job_id)}catch(err){status.textContent='Submission error: '+err.message}});
 let pollTimer=null, pollFailures=0;
 async function poll(id){
  clearTimeout(pollTimer);
