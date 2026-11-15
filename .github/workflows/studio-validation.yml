@@ -20,11 +20,11 @@ jobs:
           python-version: "3.11"
       - run: python -m pip install --upgrade pip
       - run: pip install -r video_studio/requirements.txt pytest
-      - run: pytest -q tests
+      - run: PYTHONPATH=. python -m pytest -q tests
         working-directory: video_studio
         env:
-          DATA_DIR: ./video_studio/test-data
-          OUTPUT_DIR: ./video_studio/test-output
+          DATA_DIR: ./test-data
+          OUTPUT_DIR: ./test-output
   android-debug-build:
     runs-on: ubuntu-latest
     steps:
