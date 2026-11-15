@@ -1,0 +1,12 @@
+{
+  "name": "Preet Sports AI Cricket Production Studio",
+  "short_name": "Preet Sports",
+  "description": "Create Roman Hinglish cricket commentary and video projects.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#081522",
+  "theme_color": "#081522",
+  "orientation": "portrait",
+  "categories": ["video", "sports", "productivity"]
+}
