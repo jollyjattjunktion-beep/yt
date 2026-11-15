@@ -1,6 +1,9 @@
 package com.preetsports.studio
 
 import android.os.Bundle
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -56,6 +59,9 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
     var apiKey by remember { mutableStateOf("") }
     var keySaved by remember { mutableStateOf(savedKey.isNotBlank()) }
     var notice by remember { mutableStateOf("Ready to configure your production studio.") }
+    var busy by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     Column(
         Modifier.fillMaxSize().background(Navy).verticalScroll(rememberScrollState()).padding(18.dp),
@@ -109,16 +115,37 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                 listOf("Roman Hinglish commentary", "Gemini presenter voice", "Stadium and team graphics", "Player cards and pitch report", "Head-to-head and match analysis", "9:16 and 16:9 video exports").forEach {
                     Text("✓  $it", color = Color.White)
                 }
-                Button(onClick = {
-                    notice = when {
-                        match.isBlank() -> "Enter a match name to start."
-                        !keySaved && apiKey.isBlank() -> "Save your Gemini API key first."
-                        else -> "Mobile production pipeline is being integrated. No render has been started yet."
-                    }
-                }, modifier = Modifier.fillMaxWidth()) { Text("Create cricket video") }
+                Button(
+                    enabled = !busy,
+                    onClick = {
+                        when {
+                            match.isBlank() -> notice = "Enter a match name to start."
+                            !keySaved && apiKey.isBlank() -> notice = "Save your Gemini API key first."
+                            else -> {
+                                busy = true
+                                notice = "Preparing your Roman Hinglish script…"
+                                scope.launch {
+                                    try {
+                                        val key = if (apiKey.isNotBlank()) apiKey.trim() else savedKey
+                                        val project = LocalProjectStore(context).createProject(match)
+                                        val minutes = duration.substringBefore(" ").toIntOrNull() ?: 5
+                                        val gemini = GeminiClient(key)
+                                        val script = gemini.createScript(match, format, minutes)
+                                        LocalProjectStore(context).saveScript(project, match, format, script)
+                                        notice = "Script ready. Generating presenter voice…"
+                                        val audio = gemini.createVoice(script, java.io.File(project, "voiceover.wav"))
+                                        notice = "Script and voice generated on this phone.\nSaved in: ${project.absolutePath}\nAudio: ${audio.name}\nNext stage: native video rendering."
+                                    } catch (e: Exception) {
+                                        notice = "Production step failed: ${e.message ?: "Unknown error"}"
+                                    } finally { busy = false }
+                                }
+                            }
+                        }
+                    }, modifier = Modifier.fillMaxWidth()
+                ) { Text(if (busy) "Generating…" else "Generate script + voice") }
             }
         }
         Text(notice, color = Gold)
-        Text("Phone-rendering mode · Output stays on this device", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+        Text("On-device Gemini script and voice · Video renderer integration in progress", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
     }
 }
