@@ -40,12 +40,17 @@ class AndroidMp4Renderer(private val context: Context) {
         val width = if (portrait) 720 else 1280
         val height = if (portrait) 1280 else 720
         val durationUs = wav.pcm.size.toLong() * 1_000_000L / (wav.sampleRate * wav.channels * 2L)
-        val video = encodeVideo(project, scenes, width, height, durationUs) { onProgress(it / 2) }
-        val audio = encodeAudio(project, wav) { onProgress(50 + it / 2) }
-        val output = File(project, if (portrait) "preet-sports-9x16.mp4" else "preet-sports-16x9.mp4")
-        mux(output, video, audio)
-        onProgress(100)
-        return Result(output, durationUs / 1000L, width, height)
+        val photos = ScenePhotoAssets.load(project)
+        try {
+            val video = encodeVideo(project, scenes, width, height, durationUs, photos) { onProgress(it / 2) }
+            val audio = encodeAudio(project, wav) { onProgress(50 + it / 2) }
+            val output = File(project, if (portrait) "preet-sports-9x16.mp4" else "preet-sports-16x9.mp4")
+            mux(output, video, audio)
+            onProgress(100)
+            return Result(output, durationUs / 1000L, width, height)
+        } finally {
+            photos.recycle()
+        }
     }
 
     private data class Pcm(val sampleRate: Int, val channels: Int, val pcm: ByteArray)
@@ -83,13 +88,13 @@ class AndroidMp4Renderer(private val context: Context) {
         return Pcm(rate, channels, bytes.copyOfRange(dataOffset, dataOffset + dataSize))
     }
 
-    private fun encodeVideo(project: File, scenes: List<StudioScene>, width: Int, height: Int, durationUs: Long, progress: (Int) -> Unit): TrackSpool {
+    private fun encodeVideo(project: File, scenes: List<StudioScene>, width: Int, height: Int, durationUs: Long, photos: ScenePhotoAssets, progress: (Int) -> Unit): TrackSpool {
         val mime = MediaFormat.MIMETYPE_VIDEO_AVC
         val encoder = MediaCodec.createEncoderByType(mime)
         val format = MediaFormat.createVideoFormat(mime, width, height).apply {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar)
             setInteger(MediaFormat.KEY_BIT_RATE, 1_600_000)
-            setInteger(MediaFormat.KEY_FRAME_RATE, 2)
+            setInteger(MediaFormat.KEY_FRAME_RATE, 8)
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2)
         }
         val spool = File(project, "video.samples")
@@ -97,7 +102,7 @@ class AndroidMp4Renderer(private val context: Context) {
         var outputFormat: MediaFormat? = null
         var eos = false
         var frame = 0
-        val frameDuration = 500_000L
+        val frameDuration = 125_000L
         val totalFrames = max(1, ((durationUs + frameDuration - 1) / frameDuration).toInt())
         try {
             encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
@@ -111,7 +116,7 @@ class AndroidMp4Renderer(private val context: Context) {
                         input.clear()
                         if (frame < totalFrames) {
                             val sceneIndex = min(scenes.lastIndex, frame * scenes.size / totalFrames)
-                            val bitmap = CricketSceneRenderer().draw(scenes[sceneIndex], width, height, frame)
+                            val bitmap = CricketSceneRenderer().draw(scenes[sceneIndex], width, height, frame, photos)
                             val yuv = bitmapToNv12(bitmap)
                             bitmap.recycle()
                             input.put(yuv, 0, min(yuv.size, input.remaining()))
@@ -154,10 +159,10 @@ class AndroidMp4Renderer(private val context: Context) {
         for (row in 0 until h) for (col in 0 until w) {
             val c = pixels[row * w + col]
             val r = (c shr 16) and 255; val g = (c shr 8) and 255; val b = c and 255
-            out[yIndex++] = ((66*r + 129*g + 25*b + 128 shr 8) + 16).coerceIn(0,255).toByte()
+            out[yIndex++] = (((66*r + 129*g + 25*b + 128) shr 8) + 16).coerceIn(0,255).toByte()
             if (row % 2 == 0 && col % 2 == 0) {
-                val u = ((-38*r - 74*g + 112*b + 128 shr 8) + 128).coerceIn(0,255)
-                val v = ((112*r - 94*g - 18*b + 128 shr 8) + 128).coerceIn(0,255)
+                val u = (((-38*r - 74*g + 112*b + 128) shr 8) + 128).coerceIn(0,255)
+                val v = (((112*r - 94*g - 18*b + 128) shr 8) + 128).coerceIn(0,255)
                 out[uvIndex++] = u.toByte(); out[uvIndex++] = v.toByte()
             }
         }
