@@ -227,7 +227,7 @@ class CricketSceneRenderer {
     private fun smallCenter(c:Canvas,p:Paint,text:String,w:Int,y:Float) {
         p.color=Color.rgb(205,218,229);p.textSize=w*.025f;p.textAlign=Paint.Align.CENTER;c.drawText(text,w*.5f,y,p);p.textAlign=Paint.Align.LEFT
     }
-    fun savePreview(scene:StudioScene,output:File,width:Int=720,height:Int=1280) {
-        output.parentFile?.mkdirs();draw(scene,width,height,0).compress(Bitmap.CompressFormat.JPEG,92,output.outputStream())
+    fun savePreview(scene:StudioScene,output:File,assets:ScenePhotoAssets?=null,width:Int=720,height:Int=1280) {
+        output.parentFile?.mkdirs();draw(scene,width,height,0,assets).compress(Bitmap.CompressFormat.JPEG,92,output.outputStream())
     }
 }
