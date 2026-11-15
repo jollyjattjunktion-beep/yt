@@ -1,6 +1,10 @@
 package com.preetsports.studio
 
 import android.os.Bundle
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
@@ -61,8 +65,15 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
     var activeKey by remember { mutableStateOf(savedKey) }
     var notice by remember { mutableStateOf("Ready to configure your production studio.") }
     var busy by remember { mutableStateOf(false) }
+    var photoUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val photoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia(14)
+    ) { uris ->
+        photoUris = uris.take(14)
+        notice = if (uris.isEmpty()) "No match photos selected." else "${photoUris.size} match photos selected."
+    }
 
     Column(
         Modifier.fillMaxSize().background(Navy).verticalScroll(rememberScrollState()).padding(18.dp),
@@ -112,7 +123,19 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
         }
         Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("03 · Production modules", color = Gold, fontWeight = FontWeight.Bold)
+                Text("03 · Match photos", color = Gold, fontWeight = FontWeight.Bold)
+                Text("Select up to 14 images in this order: venue, home-team, away-team, then player portraits.", color = Color.LightGray)
+                OutlinedButton(
+                    onClick = { photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Choose photos from gallery") }
+                Text(if (photoUris.isEmpty()) "No photos selected — cinematic graphic backgrounds will be used." else "${photoUris.size} photos ready for video.", color = if (photoUris.isEmpty()) Color.LightGray else Gold)
+            }
+        }
+        Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("04 · Production modules", color = Gold, fontWeight = FontWeight.Bold)
                 listOf("Roman Hinglish commentary", "Gemini presenter voice", "Stadium and team graphics", "Player cards and pitch report", "Head-to-head and match analysis", "9:16 and 16:9 video exports").forEach {
                     Text("✓  $it", color = Color.White)
                 }
@@ -129,6 +152,20 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                                     try {
                                         val key = if (apiKey.isNotBlank()) apiKey.trim() else activeKey
                                         val project = LocalProjectStore(context).createProject(match)
+                                        if (photoUris.isNotEmpty()) {
+                                            val assetDir = java.io.File(project, "assets").apply { mkdirs() }
+                                            photoUris.take(14).forEachIndexed { index, uri ->
+                                                val filename = when (index) {
+                                                    0 -> "01-venue"
+                                                    1 -> "02-home-team"
+                                                    2 -> "03-away-team"
+                                                    else -> "player-%02d".format(index - 2)
+                                                }
+                                                context.contentResolver.openInputStream(uri)?.use { input ->
+                                                    java.io.File(assetDir, filename).outputStream().use { output -> input.copyTo(output) }
+                                                }
+                                            }
+                                        }
                                         val minutes = duration.substringBefore(" ").toIntOrNull() ?: 5
                                         val gemini = GeminiClient(key)
                                         val script = gemini.createScript(match, format, minutes)
@@ -136,8 +173,13 @@ private fun StudioHome(savedKey: String, onSaveKey: (String) -> Unit) {
                                         notice = "Script ready. Generating presenter voice…"
                                         val audio = gemini.createVoice(script, java.io.File(project, "voiceover.wav"))
                                         val scenes = CricketSceneRenderer().defaultScenes(match, format)
-                                        scenes.forEachIndexed { index, scene ->
-                                            CricketSceneRenderer().savePreview(scene, java.io.File(project, "scene-${index + 1}.jpg"))
+                                        val photoAssets = ScenePhotoAssets.load(project)
+                                        try {
+                                            scenes.forEachIndexed { index, scene ->
+                                                CricketSceneRenderer().savePreview(scene, java.io.File(project, "scene-${index + 1}.jpg"), photoAssets)
+                                            }
+                                        } finally {
+                                            photoAssets.recycle()
                                         }
                                         notice = "Assets ready. Rendering landscape MP4 on this phone…"
                                         val renderer = AndroidMp4Renderer(context)
