@@ -1,64 +1,52 @@
-# Preet Sports AI Video Studio (MVP)
+# Preet Sports AI Cricket Production Studio — Local Windows Edition
 
-This folder adds an automated production application alongside the existing YouTube-agent skills. It does not replace or delete them.
+This is the local-first production application. It runs on the user's Windows PC; Render is not required for video rendering.
 
-## What works in this MVP
-- FastAPI job API and status polling
-- Optional Gemini script generation
-- Fact-safe fallback script when Gemini is not configured
-- Indian voice generation through Edge TTS
-- Original branded title-card graphics generated with Pillow
-- FFmpeg rendering to 1920x1080 and 1080x1920
-- MP3, script and YouTube metadata package
-- Responsive browser dashboard at `/`
-- Opt-in YouTube upload for both formats using the channel owner's OAuth consent
+## Current build status
 
-## Important current limitations
-- A match name alone is not a source of verified cricket facts. Configure `CRICKET_DATA_API_URL` to a trusted adapter or pass `match_facts` in the request. Without either, the fallback script intentionally avoids invented squads, stats, venue and pitch claims.
-- The current visual renderer creates original branded motionless scene cards; it does not yet create player-photo animations, licensed highlight footage, or AI-generated stadium video.
-- YouTube upload is opt-in and requires a valid Google OAuth desktop client JSON at `client_secret.json`. The first upload opens the Google consent flow on the rendering machine. Use private or unlisted for initial testing. YouTube API quota and channel policy still apply.
-- Jobs are held in process memory in this MVP. Use a persistent queue/database before multi-user or production deployment.
-- Edge TTS requires network access. Gemini is optional and requires a valid API key.
+The local foundation includes:
+- Windows installer and start/stop scripts
+- Local FastAPI dashboard bound to localhost
+- Persistent SQLite job records and separate polling worker
+- Gemini API settings form; keys are stored in local `.env`, never in source control
+- Gemini TTS adapter that requests WAV audio
+- Sequential CPU FFmpeg rendering for 16:9 and 9:16
 
-## Install locally
-Requires Python 3.11+, FFmpeg installed and available on PATH.
+The visual scene renderer currently produces original branded graphic cards with labels for team introductions, player cards, pitch report, head-to-head and prediction. It does **not yet populate those cards with researched player photos, team logos, pitch facts or H2H statistics**. Those require the cricket provider adapter and the next visual-engine implementation. Do not treat the current renderer as the finished visual studio.
 
-```bash
-cd video_studio
-python -m venv .venv
-# Windows: .venv\\Scripts\\activate
-# Linux/macOS: source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
+## Requirements
 
-Open http://127.0.0.1:8000/docs.
+- Windows 10/11, 64-bit
+- Python 3.11
+- FFmpeg and ffprobe on PATH
+- Internet access for Gemini API and (when configured) cricket data
+- 16 GB RAM recommended for full HD CPU rendering; no NVIDIA GPU required
 
-## Create a video job
-```bash
-curl -X POST http://127.0.0.1:8000/api/jobs ^
-  -H "Content-Type: application/json" ^
-  -d "{\"match_name\":\"India vs Australia 1st ODI\",\"duration_minutes\":6,\"language\":\"Roman Hinglish\",\"match_facts\":{}}"
-```
-Poll `GET /api/jobs/{job_id}`. When completed, download:
-- `/api/jobs/{job_id}/files/landscape`
-- `/api/jobs/{job_id}/files/portrait`
-- `/api/jobs/{job_id}/files/audio`
-- `/api/jobs/{job_id}/files/script`
-- `/api/jobs/{job_id}/files/metadata`
+## Install
 
-Example cricket-data adapter response contract:
-```json
-{
-  "fixture": {"date": "ISO-8601", "venue": "ground name", "format": "ODI", "status": "scheduled"},
-  "teams": [{"name": "Team A", "squad": [], "recent_results": []}, {"name": "Team B", "squad": [], "recent_results": []}],
-  "pitch_report": {"summary": "source-backed report", "source": "URL"},
-  "players": [],
-  "head_to_head": {"summary": "source-backed summary", "source": "URL"},
-  "sources": [{"name": "provider", "url": "https://...", "retrieved_at": "ISO-8601"}]
-}
-```
+1. Download the repository ZIP from the `feature/automated-video-studio` branch, or clone that branch.
+2. Open the `video_studio` folder.
+3. Run `install_windows.bat`.
+4. Install FFmpeg if the installer reports it missing. Add the FFmpeg `bin` folder to PATH.
+5. Run `start_studio.bat`.
+6. Open http://127.0.0.1:8000 and paste your Gemini API key into the settings panel.
 
-## Production hardening still required
-Persistent PostgreSQL jobs, Redis/Celery worker, secure authentication, file retention/cleanup, resumable rendering, actual provider adapters with terms-compliant access, script duration validation, subtitles, richer scene templates, YouTube OAuth upload and end-to-end tests. Do not expose this API publicly without authentication.
+## Gemini setup
+
+The settings page has separate script and TTS model fields, voice selection, and optional cricket provider credentials. The Gemini key is saved to the local `.env` file. Never paste API keys into GitHub, screenshots, chat, or public logs.
+
+The TTS adapter uses Gemini's audio response modality and writes the returned WAV data to disk. Current default TTS model is `gemini-3.8-flash-lite-tts`; select a model available to your API key/account. Voice names are configurable.
+
+## Output
+
+Generated jobs are stored in `data/studio.sqlite3`. Media is stored under `output/<match>/<job-id>/`. The worker runs separately from the API so a browser refresh does not cancel production.
+
+## Important limitations before first real match
+
+- The cricket research provider is still an adapter contract; configure a compatible endpoint returning source-backed fixture, squad, player, venue, pitch and H2H data.
+- The long-form script generator and fact validator still need completion and tests.
+- Player photos/team logos must come from licensed, permitted or user-owned assets. No broadcast footage is bundled.
+- Subtitles, detailed scene-to-speech synchronization, thumbnail and final quality gate are still to be completed.
+- YouTube publishing is not enabled in this local foundation.
+
+Do not publish a video as a complete match preview until its research facts and generated output have been checked.
