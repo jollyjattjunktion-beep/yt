@@ -65,10 +65,11 @@ class MatchResearchEngine(private val importer: MatchUrlImporter = MatchUrlImpor
             val noise = Regex("(?i)\\b(featured videos?|videos?|rankings?|teams videos?|more matches|live:|need \\d+ off|watch now|highlights)\\b")
             val found = raw.pages.mapNotNull { page ->
                 pattern.find(page.extractedText)?.let { match ->
-                    val value = match.groupValues.getOrNull(1)?.trim()
-                        ?.substringBefore(Regex("(?i)\\b(FEATURED VIDEOS?|VIDEOS?|RANKINGS?|MORE MATCHES|LIVE:)\\b"))
-                        ?.trim(' ', '|', '•', '-', ':')
-                        ?.take(120).orEmpty()
+                    val rawValue = match.groupValues.getOrNull(1).orEmpty()
+                    val stop = Regex("(?i)\\b(FEATURED VIDEOS?|VIDEOS?|RANKINGS?|MORE MATCHES|LIVE:)\\b").find(rawValue)
+                    val value = (if (stop != null) rawValue.substring(0, stop.range.first) else rawValue)
+                        .trim(' ', '|', '•', '-', ':')
+                        .take(120)
                     if (value.length < 3 || noise.containsMatchIn(value)) null
                     else Triple(page, value, match.value.take(180))
                 }
