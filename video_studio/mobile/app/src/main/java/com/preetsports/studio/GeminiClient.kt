@@ -69,6 +69,25 @@ class GeminiClient(private val apiKey: String) {
             .getJSONArray("parts").getJSONObject(0).getString("text").trim()
     }
 
+    suspend fun convertRomanHinglishForHindiVoice(script: String): String = withContext(Dispatchers.IO) {
+        require(apiKey.isNotBlank()) { "Gemini key is required to prepare text for the experimental Hindi voice." }
+        require(script.isNotBlank()) { "Script is empty; generate the script before voice conversion." }
+        val prompt = HinglishSpeechPreprocessor.buildConversionPrompt(script)
+        val contents = JSONArray().put(
+            JSONObject().put("role", "user").put(
+                "parts", JSONArray().put(JSONObject().put("text", prompt))
+            )
+        )
+        val response = post(
+            "gemini-3.8-flash",
+            JSONObject().put("contents", contents)
+                .put("generationConfig", JSONObject().put("temperature", 0.1))
+        )
+        val converted = response.getJSONArray("candidates").getJSONObject(0)
+            .getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
+        HinglishSpeechPreprocessor.validate(script, converted)
+    }
+
     suspend fun createVoice(script: String, output: File, model: String = "gemini-3.8-flash-lite-tts", voice: String = "Charon", onProgress: (String) -> Unit = {}): File =
         withContext(Dispatchers.IO) {
             require(apiKey.isNotBlank()) { "Add your Gemini API key in Settings first." }
