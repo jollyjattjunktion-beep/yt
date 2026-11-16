@@ -48,8 +48,8 @@ class MainActivity : ComponentActivity() {
                 onPrimary = Navy, onBackground = Color.White, onSurface = Color.White
             )) {
                 StudioHome(
-                    scriptKey = safePrefs.getString("gemini_script_key", safePrefs.getString("apinex_script_key", "")) ?: "",
-                    scriptModel = safePrefs.getString("gemini_script_model", safePrefs.getString("apinex_script_model", "gemini-3.8-flash")) ?: "gemini-3.8-flash",
+                    scriptKey = safePrefs.getString("gemini_script_key", "") ?: "",
+                    scriptModel = safePrefs.getString("gemini_script_model", "gemini-3.8-flash") ?: "gemini-3.8-flash",
                     onSaveScriptKey = { safePrefs.edit().putString("gemini_script_key", it.trim()).apply() },
                     onSaveScriptModel = { safePrefs.edit().putString("gemini_script_model", it.trim()).apply() },
 
