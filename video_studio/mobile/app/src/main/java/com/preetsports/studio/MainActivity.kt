@@ -199,7 +199,7 @@ private fun StudioHome(
         Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("03 · Script and voice settings", color = Gold, fontWeight = FontWeight.Bold)
-                Text("Gemini generates the Roman Hinglish cricket pre-analysis script only. Android Text-to-Speech on this phone creates the narration locally. No Gemini or Gemini TTS voice service is used.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+                Text("Gemini generates the Roman Hinglish cricket pre-analysis script only. Android Text-to-Speech on this phone creates the narration locally. No APInex or Gemini TTS voice service is used.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
                 OutlinedTextField(
                     value = scriptApiKey,
                     onValueChange = { entered ->
@@ -257,6 +257,8 @@ private fun StudioHome(
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Preview Android Hinglish voice") }
+            }
+        }
         Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("04 · Generate and review script", color = Gold, fontWeight = FontWeight.Bold)
@@ -326,7 +328,7 @@ private fun StudioHome(
                         when {
                             match.isBlank() -> notice = "Enter a match name to start."
                             iccUrl.isBlank() && cricbuzzUrl.isBlank() -> notice = "Add at least one ICC or Cricbuzz URL before starting research."
-                            !(scriptKeySaved || scriptApiKey.isNotBlank()) -> notice = "Enter your Gemini Script API key first."
+                            scriptText.isBlank() && !(scriptKeySaved || scriptApiKey.isNotBlank()) -> notice = "Enter your Gemini Script API key to generate the script."
                             else -> {
                                 busy = true
                                 notice = "STAGE 1/3 — Researching both match sources…"
