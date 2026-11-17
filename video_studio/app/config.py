@@ -1,4 +1,5 @@
 from pathlib import Path
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -7,7 +8,6 @@ class Settings(BaseSettings):
     output_dir: Path = Path("./output")
     data_dir: Path = Path("./data")
     gemini_api_key: str = ""
-    # Gemini 3.8 Flash is the current default for script and scene generation.
     gemini_model: str = "gemini-3.8-flash"
     gemini_tts_model: str = "gemini-2.5-flash-preview-tts"
     gemini_tts_voice: str = "Charon"
@@ -18,6 +18,15 @@ class Settings(BaseSettings):
     ffmpeg_bin: str = "ffmpeg"
     youtube_client_secrets_file: Path = Path("./client_secret.json")
     youtube_token_file: Path = Path("./youtube_token.json")
+
+    @field_validator("gemini_model", mode="before")
+    @classmethod
+    def migrate_legacy_gemini_model(cls, value):
+        # Older local .env files and saved dashboard settings may still contain this model.
+        legacy = {"gemini-2.5-flash", "models/gemini-2.5-flash"}
+        if isinstance(value, str) and value.strip() in legacy:
+            return "gemini-3.8-flash"
+        return value
 
 settings = Settings()
 settings.output_dir.mkdir(parents=True, exist_ok=True)
