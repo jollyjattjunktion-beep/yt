@@ -2,12 +2,12 @@ import uuid
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from .config import settings
 from .schemas import MatchRequest
 from .job_store import create_job, get_job, connect
 
-app=FastAPI(title=settings.app_name,version="0.3.0")
+app=FastAPI(title=settings.app_name,version="0.3.1")
 
 @app.get("/",response_class=HTMLResponse)
 def home():
@@ -28,13 +28,21 @@ def read_settings():
 
 class SettingsRequest(BaseModel):
     gemini_api_key:str=""
-    gemini_model:str="gemini-2.5-flash"
+    gemini_model:str="gemini-3.8-flash"
     gemini_tts_model:str="gemini-2.5-flash-preview-tts"
     gemini_tts_voice:str="Charon"
     tts_provider:str="edge"
     edge_tts_voice:str="hi-IN-MadhurNeural"
     cricket_data_api_url:str=""
     cricket_data_api_key:str=""
+
+    @field_validator("gemini_model", mode="before")
+    @classmethod
+    def migrate_legacy_gemini_model(cls, value):
+        legacy = {"gemini-2.5-flash", "models/gemini-2.5-flash"}
+        if isinstance(value, str) and value.strip() in legacy:
+            return "gemini-3.8-flash"
+        return value
 
 @app.post("/api/settings")
 def save_settings(req:SettingsRequest):
@@ -55,7 +63,10 @@ def save_settings(req:SettingsRequest):
       ("tts_provider","TTS_PROVIDER"),("edge_tts_voice","EDGE_TTS_VOICE"),
       ("cricket_data_api_url","CRICKET_DATA_API_URL"),("cricket_data_api_key","CRICKET_DATA_API_KEY")]:
         setattr(settings,attr,existing.get(key,""))
-    return {"saved":True,"gemini_api_key_set":bool(settings.gemini_api_key)}
+    # Re-read through Settings so legacy model IDs are normalized consistently.
+    from .config import reload_settings
+    reload_settings()
+    return {"saved":True,"gemini_api_key_set":bool(settings.gemini_api_key),"gemini_model":settings.gemini_model}
 
 @app.post("/api/jobs")
 def create(req:MatchRequest):
