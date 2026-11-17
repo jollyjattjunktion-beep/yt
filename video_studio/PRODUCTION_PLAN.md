@@ -1,46 +1,22 @@
-# Preet Sports AI Cricket Production Studio — Local-First Completion Plan
+# Preet Sports AI Cricket Production Studio — Windows Laptop Build
 
-This is a local-first build. The complete studio will be created and tested before installation on the user's Windows PC. Render is not required for video production. The existing YouTube skills and helper scripts remain untouched; all changes stay on `feature/automated-video-studio` until acceptance tests pass.
+## Selected product
+Local Windows desktop workflow, sports-broadcast visual style, 8–12 minute Roman Hinglish pre-analysis, CPU-first rendering, no Android dependency.
 
-## Product contract
+## Production pipeline
+1. Match resolution and source-backed cricket research.
+2. Gemini creates a spoken Roman Hinglish script sized for 8–12 minutes (125–140 words/minute).
+3. User can review and correct the saved script before final publishing; generated scripts are retained as editable TXT.
+4. TTS produces a standards-compliant 24 kHz mono WAV. Edge TTS MadhurNeural is the default no-additional-API-cost online voice; Gemini TTS is an optional provider requiring API access.
+5. Gemini creates a JSON storyboard with narration anchors and visual types; deterministic sports graphics are used if planning is unavailable.
+6. FFmpeg assembles landscape 1920x1080 and portrait 1080x1920 MP4, subtitles, thumbnail, metadata and manifest.
+7. ffprobe validates streams, duration and dimensions before job completion.
 
-Enter a match name and select a 5–7 minute preview. The studio resolves the fixture, gathers source-backed cricket facts, writes a Roman Hinglish presenter script, synthesizes narration, creates data-driven visual scenes, renders 16:9 and 9:16 videos, and packages subtitles, thumbnail, script and YouTube metadata. YouTube publishing is always an explicit opt-in and defaults to private.
+## Visual language
+Original navy/gold cricket broadcast package, stadium atmosphere, team matchup cards, player cards, pitch/venue report, stat panels, tactical field diagrams, key battles, prediction and outro. Use supplied/appropriately licensed player photos and logos only; use silhouettes or typography when unavailable. Do not use unlicensed broadcast footage.
 
-A job is successful only when required outputs exist, pass validation and can be downloaded. Missing research must be visible; the system must not fabricate squads, player photos, statistics, venue conditions, pitch reports or head-to-head records.
+## Runtime
+Windows 10/11, Python 3.11, FFmpeg/ffprobe, local FastAPI + SQLite + worker. API binds to 127.0.0.1 only. Gemini key is stored in local ignored .env. No public hosting or GPU requirement.
 
-## Ten stages and acceptance criteria
-
-1. **Fixture resolution** — resolve teams, match number, format, local start time, venue and stable fixture identity. Ambiguous matches require a selection rather than guessing.
-2. **Research aggregation** — normalized fixture, teams, squads, player profiles, recent form, venue, pitch, head-to-head, source URLs and retrieval timestamps from configured, permitted data providers.
-3. **Fact validation** — normalize names/dates, detect conflicts, attach provenance to claims and mark unavailable facts. Unsupported claims cannot enter narration or graphics.
-4. **Script generation** — 5–7 minute spoken script, length validated against speaking rate, Roman Hinglish only, natural hooks/transitions, tactical analysis and qualified prediction. Retry or fail clearly if too short.
-5. **Voice synthesis** — Gemini TTS provider with configurable voice/style and explicit fallback. Save audio and timing/alignment metadata when supported.
-6. **Visual scene engine** — stadium-style opening, team introductions, player cards, pitch report, H2H, key battles, tactical factors and prediction. Use licensed/provider-supplied or user-owned assets only; use initials/silhouettes when photos are unavailable.
-7. **Editorial assembly** — time scenes to narration; create SRT and optional burned-in subtitles, transitions, subtle original music and controlled sound design. No broadcast footage without rights.
-8. **Multi-format rendering** — render 16:9 and 9:16 sequentially with bounded FFmpeg threads and memory-aware settings. Generate thumbnail and project metadata.
-9. **Publishing package** — title, description, tags, chapters, thumbnail and output manifest. OAuth upload is optional, user-authorized and private by default.
-10. **Quality gate** — verify duration, codecs, aspect ratios, subtitles, thumbnail, metadata, scene coverage, source manifest and files before marking complete.
-
-## Local-first runtime architecture
-
-- **Windows desktop app:** local FastAPI dashboard opened in the browser, started/stopped with simple `.bat` scripts. No public deployment is needed for local production.
-- **Local persistent jobs:** SQLite database by default so job history and progress survive restarts; PostgreSQL can be an optional later mode.
-- **Separate worker process:** API submits jobs to a durable local queue; a worker performs research, TTS and FFmpeg rendering. Never run heavy video rendering inside the API request process.
-- **Local artifact storage:** output folders on disk, organized by match and job ID; downloads and job history remain available after restart.
-- **CPU-first rendering:** no NVIDIA GPU requirement. Sequential output rendering, bounded FFmpeg threads, sensible preview/production presets and memory checks for a 16 GB Windows PC.
-- **Secrets and security:** local `.env` file, ignored by Git; dashboard bound to localhost by default. No public access unless explicitly configured.
-- **Optional integrations:** Gemini API key for script/TTS; a permitted cricket data API adapter for current match facts; optional Google OAuth only when the user enables upload.
-
-## Local installation package (created after implementation)
-
-Provide `install_windows.bat`, `start_studio.bat`, `stop_studio.bat`, `check_setup.bat`, `.env.example`, pinned dependencies, FFmpeg setup/check instructions, and a clear README. Installation should create a Python virtual environment, install dependencies, initialize the local database and verify FFmpeg/ffprobe. Do not bundle or commit credentials.
-
-## Build and acceptance gates
-
-- **A — Local foundation:** persistent SQLite jobs, queue/worker separation, progress, restart recovery and Windows launch scripts.
-- **B — Cricket intelligence:** adapter contract, source provenance, conflict/missing-data handling and fixture disambiguation.
-- **C — Editorial engine:** long-form script validation, Gemini TTS, scene templates and subtitle timing.
-- **D — Rendering:** landscape/portrait, thumbnail, resource-bounded CPU rendering and output manifest.
-- **E — End-to-end:** automated tests for fixture/missing data, worker recovery, script length, render smoke test, quality gate and optional private upload.
-
-The first real match is not production-ready until Gates A–E pass. The user will install the finished local package only after this build and test phase.
+## Honest limitations
+A cricket data provider must be configured or facts supplied for source-backed player, venue, pitch, form and H2H analysis. Gemini scene plans are instructions, not generated footage. The current visual renderer uses original graphics cards; player-photo fetching, live data adapters, script approval UI and final end-to-end Windows playback testing remain later acceptance gates.

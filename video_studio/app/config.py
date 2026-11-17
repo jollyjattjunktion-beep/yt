@@ -8,12 +8,12 @@ class Settings(BaseSettings):
     data_dir: Path = Path("./data")
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.5-flash"
-    gemini_tts_model: str = "gemini-3.8-flash-lite-tts"
+    gemini_tts_model: str = "gemini-2.5-flash-preview-tts"
     gemini_tts_voice: str = "Charon"
+    tts_provider: str = "edge"
+    edge_tts_voice: str = "hi-IN-MadhurNeural"
     cricket_data_api_url: str = ""
     cricket_data_api_key: str = ""
-    tts_voice: str = "en-IN-PrabhatNeural"
-    tts_rate: str = "+0%"
     ffmpeg_bin: str = "ffmpeg"
     youtube_client_secrets_file: Path = Path("./client_secret.json")
     youtube_token_file: Path = Path("./youtube_token.json")
@@ -23,7 +23,6 @@ settings.output_dir.mkdir(parents=True, exist_ok=True)
 settings.data_dir.mkdir(parents=True, exist_ok=True)
 
 def reload_settings():
-    """Refresh credentials saved from the local dashboard without restarting the worker."""
     fresh=Settings()
     for key,value in fresh.__dict__.items():
         setattr(settings,key,value)

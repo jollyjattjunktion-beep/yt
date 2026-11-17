@@ -1,57 +1,27 @@
-# Preet Sports AI Cricket Production Studio — Local Windows Edition
+# Preet Sports AI Cricket Production Studio — Windows Laptop
 
-This is the local-first production application. It runs on the user's Windows PC; Render is not required for video rendering.
+A local-first desktop production dashboard for 8–12 minute Roman Hinglish cricket pre-analysis videos.
 
-## Current build status
-
-The local foundation includes:
-- Windows installer and start/stop scripts
-- Local FastAPI dashboard bound to localhost
-- Persistent SQLite job records and separate polling worker
-- Gemini API settings form; keys are stored in local `.env`, never in source control
-- Gemini TTS adapter that requests WAV audio
-- Sequential CPU FFmpeg rendering for 16:9 and 9:16
-
-The visual scene renderer currently produces original branded graphic cards with labels for team introductions, player cards, pitch report, head-to-head and prediction. It does **not yet populate those cards with researched player photos, team logos, pitch facts or H2H statistics**. Those require the cricket provider adapter and the next visual-engine implementation. Do not treat the current renderer as the finished visual studio.
+## Pipeline
+Match research → Gemini Roman Hinglish script → narration WAV → Gemini scene plan → original sports-broadcast graphics → FFmpeg MP4.
 
 ## Requirements
-
-- Windows 10/11, 64-bit
+- Windows 10/11 64-bit
 - Python 3.11
 - FFmpeg and ffprobe on PATH
-- Internet access for Gemini API and (when configured) cricket data
-- 16 GB RAM recommended for full HD CPU rendering; no NVIDIA GPU required
+- Internet for Gemini script/scene planning and Edge TTS; Gemini TTS is optional and requires model/API access
+- 16 GB RAM recommended; CPU rendering, no NVIDIA GPU required
 
-## Install
-
-1. Download the repository ZIP from the `feature/automated-video-studio` branch, or clone that branch.
-2. Open the `video_studio` folder.
+## Install and run
+1. Download/clone branch `feature/automated-video-studio`.
+2. Open `video_studio`.
 3. Run `install_windows.bat`.
-4. Install FFmpeg if the installer reports it missing. Add the FFmpeg `bin` folder to PATH.
-5. Run `start_studio.bat`.
-6. Open http://127.0.0.1:8000 and paste your Gemini API key into the settings panel.
+4. Ensure FFmpeg is installed and available in PATH.
+5. Run `start_studio.bat`, then open http://127.0.0.1:8000.
+6. Save your Gemini API key in Settings. For Madhur voice, select Edge TTS and `hi-IN-MadhurNeural`; this uses internet and is not offline. Gemini TTS can be selected as an alternative if enabled for your account.
 
-## Gemini setup
+## Duration and output
+Choose 8, 10 or 12 minutes. The studio creates Roman Hinglish script TXT, narration WAV, SRT subtitles, thumbnail, metadata, output manifest, 16:9 MP4 and 9:16 MP4.
 
-The settings page has separate script and TTS model fields, voice selection, and optional cricket provider credentials. The Gemini key is saved to the local `.env` file. Never paste API keys into GitHub, screenshots, chat, or public logs.
-
-The TTS adapter uses Gemini's audio response modality and writes the returned WAV data to disk. Current default TTS model is `gemini-3.8-flash-lite-tts`; select a model available to your API key/account. Voice names are configurable.
-
-## Output
-
-Generated jobs are stored in `data/studio.sqlite3`. Media is stored under `output/<match>/<job-id>/`. The worker runs separately from the API so a browser refresh does not cancel production.
-
-## Important limitations before first real match
-
-- The cricket research provider is still an adapter contract; configure a compatible endpoint returning source-backed fixture, squad, player, venue, pitch and H2H data.
-- The long-form script generator and fact validator still need completion and tests.
-- Player photos/team logos must come from licensed, permitted or user-owned assets. No broadcast footage is bundled.
-- Subtitles, detailed scene-to-speech synchronization, thumbnail and final quality gate are still to be completed.
-- YouTube publishing is not enabled in this local foundation.
-
-Do not publish a video as a complete match preview until its research facts and generated output have been checked.
-
-
-## Android native renderer
-
-The Android project under `mobile/` now includes an on-device H.264/AAC MP4 renderer and dual 16:9/9:16 export integration. CI validates Python tests and assembles a debug APK. A green CI build is not a substitute for playback testing on the target Android handset; device validation is still required before release.
+## Important
+The first build uses original generated sports graphics, not real match footage. Player photographs/logos and current match statistics require licensed/user-owned assets or a configured cricket data provider. Missing facts must remain marked unavailable. Review all match facts and script before publishing. YouTube publishing is not enabled by default.

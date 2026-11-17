@@ -92,27 +92,36 @@ def research_scenes(research: dict,match_name: str):
       ("HEAD TO HEAD",h2h_line),("MATCH PREDICTION",prediction_line),
       ("PREET SPORTS","Roman Hinglish cricket analysis")]
 
-async def render_video(script: str,match_name: str,job_dir: Path,voice: str|None=None,research: dict|None=None):
+async def render_video(script: str,match_name: str,job_dir: Path,voice: str|None=None,research: dict|None=None,scenes: list[dict]|None=None,tts_provider: str|None=None):
     if not shutil.which(settings.ffmpeg_bin) and not Path(settings.ffmpeg_bin).exists():
         raise RuntimeError("FFmpeg not found. Install FFmpeg and add its bin folder to PATH.")
     job_dir.mkdir(parents=True,exist_ok=True)
-    audio=job_dir/"voiceover.wav"; await synthesize(script,audio)
-    total=media_duration(audio); scenes=research_scenes(research or {},match_name)
+    audio=job_dir/"voiceover.wav"; await synthesize(script,audio,provider=tts_provider,voice=voice)
+    total=media_duration(audio); scenes=scenes or research_scenes(research or {},match_name)
     srt=job_dir/"subtitles.srt"; make_srt(script,total,srt)
     outputs=[]
     for size,suffix in [((1920,1080),"16x9"),((1080,1920),"9x16")]:
         cards=job_dir/suffix; cards.mkdir(exist_ok=True); concat=job_dir/f"{suffix}.txt"
-        weights=[.12,.15,.15,.13,.13,.17,.15]; durations=[total*x for x in weights]
+        weights=[max(.1,float(s.get("weight",1))) for s in scenes]
+        weight_sum=sum(weights); durations=[total*x/weight_sum for x in weights]
         with concat.open("w",encoding="utf-8") as f:
-            for i,(title,sub) in enumerate(scenes):
+            for i,scene in enumerate(scenes):
+                title=scene.get("title","MATCH ANALYSIS")
+                sub=scene.get("subtitle","")
                 p=cards/f"scene-{i:02d}.jpg"; make_card(p,size,title,sub,i+1)
                 f.write(f"file '{p.resolve().as_posix()}'\nduration {durations[i]}\n")
-            f.write(f"file '{(cards/'scene-06.jpg').resolve().as_posix()}'\n")
+            f.write(f"file '{(cards/f'scene-{len(scenes)-1:02d}.jpg').resolve().as_posix()}'\n")
         out=job_dir/f"preet-sports-{suffix}.mp4"
         run_ffmpeg([settings.ffmpeg_bin,"-y","-threads","2","-f","concat","-safe","0","-i",str(concat),"-i",str(audio),
           "-vf","fps=30,format=yuv420p","-c:v","libx264","-preset","veryfast","-threads","2",
           "-c:a","aac","-b:a","192k","-shortest","-movflags","+faststart",str(out)])
         if not out.is_file() or out.stat().st_size<10000: raise RuntimeError(f"Render quality check failed for {suffix}.")
+        probe=shutil.which("ffprobe")
+        check=subprocess.run([probe,"-v","error","-show_entries","stream=codec_type,width,height","-of","json",str(out)],capture_output=True,text=True) if probe else None
+        if not check or check.returncode: raise RuntimeError(f"ffprobe validation failed for {suffix}.")
+        streams=json.loads(check.stdout).get("streams",[])
+        if not any(x.get("codec_type")=="video" for x in streams) or not any(x.get("codec_type")=="audio" for x in streams):
+            raise RuntimeError(f"Output is missing an audio or video stream: {suffix}.")
         outputs.append(out)
     (job_dir/"script.txt").write_text(script,encoding="utf-8")
     thumb=job_dir/"thumbnail.jpg"

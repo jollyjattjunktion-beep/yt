@@ -7,20 +7,11 @@ from .config import settings
 from .schemas import MatchRequest
 from .job_store import create_job, get_job, connect
 
-app=FastAPI(title=settings.app_name,version="0.2.0")
+app=FastAPI(title=settings.app_name,version="0.3.0")
 
 @app.get("/",response_class=HTMLResponse)
 def home():
     return Path(__file__).with_name("dashboard.html").read_text(encoding="utf-8")
-
-@app.get("/manifest.webmanifest")
-def web_manifest():
-    return FileResponse(Path(__file__).with_name("manifest.webmanifest"), media_type="application/manifest+json")
-
-@app.get("/sw.js")
-def service_worker():
-    return FileResponse(Path(__file__).with_name("sw.js"), media_type="application/javascript",
-                        headers={"Cache-Control":"no-cache", "Service-Worker-Allowed": "/"})
 
 @app.get("/health")
 def health():
@@ -32,13 +23,16 @@ def read_settings():
     return {"gemini_api_key_set":bool(settings.gemini_api_key),
       "gemini_api_key_masked":("••••••••"+settings.gemini_api_key[-4:]) if settings.gemini_api_key else "",
       "gemini_model":settings.gemini_model,"gemini_tts_model":settings.gemini_tts_model,
-      "gemini_tts_voice":settings.gemini_tts_voice,"cricket_data_api_url":settings.cricket_data_api_url}
+      "gemini_tts_voice":settings.gemini_tts_voice,"tts_provider":settings.tts_provider,
+      "edge_tts_voice":settings.edge_tts_voice,"cricket_data_api_url":settings.cricket_data_api_url}
 
 class SettingsRequest(BaseModel):
     gemini_api_key:str=""
     gemini_model:str="gemini-2.5-flash"
-    gemini_tts_model:str="gemini-3.8-flash-lite-tts"
+    gemini_tts_model:str="gemini-2.5-flash-preview-tts"
     gemini_tts_voice:str="Charon"
+    tts_provider:str="edge"
+    edge_tts_voice:str="hi-IN-MadhurNeural"
     cricket_data_api_url:str=""
     cricket_data_api_key:str=""
 
@@ -51,12 +45,14 @@ def save_settings(req:SettingsRequest):
                 k,v=line.split("=",1); existing[k]=v
     values={"GEMINI_API_KEY":req.gemini_api_key.strip(),"GEMINI_MODEL":req.gemini_model.strip(),
       "GEMINI_TTS_MODEL":req.gemini_tts_model.strip(),"GEMINI_TTS_VOICE":req.gemini_tts_voice.strip(),
+      "TTS_PROVIDER":req.tts_provider.strip(),"EDGE_TTS_VOICE":req.edge_tts_voice.strip(),
       "CRICKET_DATA_API_URL":req.cricket_data_api_url.strip(),"CRICKET_DATA_API_KEY":req.cricket_data_api_key.strip()}
     for k,v in values.items():
         if v or k not in existing: existing[k]=v
     env_path.write_text("\n".join(f"{k}={v}" for k,v in existing.items())+"\n",encoding="utf-8")
     for attr,key in [("gemini_api_key","GEMINI_API_KEY"),("gemini_model","GEMINI_MODEL"),
       ("gemini_tts_model","GEMINI_TTS_MODEL"),("gemini_tts_voice","GEMINI_TTS_VOICE"),
+      ("tts_provider","TTS_PROVIDER"),("edge_tts_voice","EDGE_TTS_VOICE"),
       ("cricket_data_api_url","CRICKET_DATA_API_URL"),("cricket_data_api_key","CRICKET_DATA_API_KEY")]:
         setattr(settings,attr,existing.get(key,""))
     return {"saved":True,"gemini_api_key_set":bool(settings.gemini_api_key)}
@@ -80,6 +76,6 @@ def download(job_id:str,kind:str):
       "audio":job["result"]["audio"],"script":job["result"]["script"],"subtitles":job["result"]["subtitles"],
       "thumbnail":job["result"]["thumbnail"],"metadata":job["result"]["metadata"],"manifest":job["result"]["manifest"]}
     if kind not in mapping: raise HTTPException(404,"Unknown output")
-    path=Path(mapping[kind])
+    path=Path(mapping[kind]).resolve()
     if not path.is_file(): raise HTTPException(404,"File missing")
     return FileResponse(path,filename=path.name)
