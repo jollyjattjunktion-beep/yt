@@ -33,8 +33,9 @@ RESEARCH JSON: {json.dumps(research,ensure_ascii=False)}
     async with httpx.AsyncClient(timeout=150) as client:
         for attempt in range(2):
             response=await client.post(url,params={"key":settings.gemini_api_key},
-              json={"contents":[{"parts":[{"text":prompt}]}],"generationConfig":{"temperature":0.55}})
-            if response.is_error: raise RuntimeError(f"Gemini script error {response.status_code}: {response.text[:1000]}")
+              json={"contents":[{"parts":[{"text":prompt}]}]})
+            if response.is_error:
+                raise RuntimeError(f"Gemini script error {response.status_code}: {response.text[:1000]}")
             data=response.json()
             try: script=data["candidates"][0]["content"]["parts"][0]["text"].strip()
             except (KeyError,IndexError,TypeError): raise RuntimeError("Gemini returned no script text.")
