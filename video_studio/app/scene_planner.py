@@ -1,5 +1,5 @@
 """Gemini scene planning with a deterministic, safe fallback."""
-import json, re, httpx
+import json, httpx
 from .config import settings
 
 async def plan_scenes(match_name: str, script: str, research: dict, duration: float) -> list[dict]:
@@ -15,8 +15,16 @@ SCRIPT: {script}
 """
     url=f"https://generativelanguage.googleapis.com/v1beta/models/{settings.gemini_model}:generateContent"
     async with httpx.AsyncClient(timeout=120) as client:
-        response=await client.post(url,params={"key":settings.gemini_api_key},json={"contents":[{"parts":[{"text":prompt}]}],"generationConfig":{"temperature":0.25,"responseMimeType":"application/json"}})
-        if response.is_error: return fallback_scenes(match_name, research)
+        response=await client.post(
+            url,
+            params={"key":settings.gemini_api_key},
+            json={
+                "contents":[{"parts":[{"text":prompt}]}],
+                "generationConfig":{"responseMimeType":"application/json"}
+            }
+        )
+        if response.is_error:
+            return fallback_scenes(match_name, research)
         try:
             raw=response.json()["candidates"][0]["content"]["parts"][0]["text"]
             data=json.loads(raw)
