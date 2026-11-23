@@ -28,13 +28,13 @@ SCRIPT: {script}
         try:
             raw=response.json()["candidates"][0]["content"]["parts"][0]["text"]
             data=json.loads(raw)
-            if isinstance(data,list) and 6 <= len(data) <= 16:
+            if isinstance(data,list) and 8 <= len(data) <= 12:
                 allowed={"opener","team_card","player_card","pitch_graphic","stat_graphic","tactics_board","matchup","prediction","outro"}
                 clean=[]
                 for item in data:
                     if not isinstance(item,dict): continue
                     clean.append({"title":str(item.get("title","MATCH ANALYSIS"))[:60],"subtitle":str(item.get("on_screen_text",""))[:140],"type":item.get("visual_type") if item.get("visual_type") in allowed else "stat_graphic","anchor":str(item.get("narration_anchor",""))[:180],"weight":max(.1,float(item.get("duration_weight",1)))})
-                if len(clean)>=6: return clean
+                if len(clean)>=8: return clean[:12]
         except Exception: pass
     return fallback_scenes(match_name, research)
 
