@@ -155,3 +155,29 @@ object PlayerFormParser {
         .replace(Regex("\\s*\\((?:c|wk|c & wk)\\)", RegexOption.IGNORE_CASE), "")
         .replace(Regex("\\s+"), " ").trim(' ', ',', ':', '•', '-')
 }
+
+data class PlayerFantasyForm(
+    val player: String,
+    val matches: Int,
+    val averageFantasyFormPoints: Double,
+    val recentPoints: List<Double>,
+    val explanation: String
+)
+
+object FantasyFormEngine {
+    // Transparent internal baseline only; not a claim to reproduce any fantasy platform's live rules.
+    fun evaluate(summary: PlayerFormSummary): PlayerFantasyForm {
+        val points = summary.recentRecords.map { row ->
+            (row.runs ?: 0) * 1.0 +
+                (row.fours ?: 0) * 1.0 +
+                (row.sixes ?: 0) * 2.0 +
+                (row.wickets ?: 0) * 25.0 +
+                (row.maidens ?: 0) * 8.0 +
+                (row.catches ?: 0) * 8.0 +
+                (row.runOuts ?: 0) * 8.0
+        }
+        val average = if (points.isEmpty()) 0.0 else points.average()
+        return PlayerFantasyForm(summary.player, summary.matches, average, points,
+            "Runs + boundaries + wickets + maidens + fielding where scorecard evidence exists; platform bonus rules are not applied.")
+    }
+}
