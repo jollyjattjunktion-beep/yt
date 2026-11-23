@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.8-flash"
     gemini_image_model: str = "gemini-nano-banana-2.1"
+    colab_image_worker_url: str = ""
+    colab_worker_token: str = ""
+    colab_image_timeout_seconds: int = 300
     gemini_tts_model: str = "gemini-2.5-flash-preview-tts"
     gemini_tts_voice: str = "Charon"
     tts_fallback_order: str = "vexyl,indicvoice,edge"
