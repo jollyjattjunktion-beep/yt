@@ -109,11 +109,23 @@ private fun PreetApp() {
                         onPickScreenshots = { screenshotPicker.launch(arrayOf("image/*")) },
                         status = status,
                         onPrepare = {
-                            status = when {
-                                matchUrl.isBlank() -> "Paste a match URL first."
-                                !matchUrl.startsWith("https://") && !matchUrl.startsWith("http://") -> "Please enter a valid http(s) match URL."
-                                matchScreenshots.isEmpty() -> "Match URL entered. Attach CREX page screenshots too if the page cannot be read automatically."
-                                else -> "Match URL and ${matchScreenshots.size} screenshots selected. Connect the research and image-rendering API to generate graphics."
+                            if (isPreparing) { status = "Production is already running." }
+                            else if (matchUrl.isBlank()) { status = "Paste a match URL first." }
+                            else {
+                                scope.launch {
+                                    isPreparing = true
+                                    try {
+                                        status = "Uploading match URL and screenshots…"
+                                        val jobId = PreetMobileApi.submit(context, matchUrl, matchScreenshots)
+                                        status = "Upload complete. Researching match facts. Job: " + jobId
+                                        PreetMobileApi.waitForJob(jobId) { update -> status = update }
+                                        val downloadId = PreetMobileApi.downloadLandscape(context, jobId)
+                                        status = "Production complete. 1080p MP4 download queued (ID " + downloadId + "). Check Movies/PreetSports."
+                                        Toast.makeText(context, "Preet Sports MP4 download started", Toast.LENGTH_LONG).show()
+                                    } catch (error: Exception) {
+                                        status = "Production error: " + (error.message ?: "Unknown error")
+                                    } finally { isPreparing = false }
+                                }
                             }
                         }
                     )
