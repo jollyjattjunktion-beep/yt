@@ -68,11 +68,11 @@ private fun PreetApp() {
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text("PREET", color = Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 4.sp)
-                Text("AI Video Studio", color = Color.White, fontSize = 29.sp, fontWeight = FontWeight.ExtraBold)
-                Text("Create original videos directly from your phone.", color = Muted, fontSize = 14.sp)
+                Text("Preet Sports AI", color = Color.White, fontSize = 29.sp, fontWeight = FontWeight.ExtraBold)
+                Text("Upcoming-match cricket pre-analysis, created from your phone.", color = Muted, fontSize = 14.sp)
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    ModuleTab("Cricket Analysis", module == "cricket", Modifier.weight(1f)) { module = "cricket"; status = "Paste a match URL to prepare a Preet Sports analysis video." }
+                    ModuleTab("Upcoming Match Analysis", module == "cricket", Modifier.weight(1f)) { module = "cricket"; status = "Paste a match URL to prepare a Preet Sports analysis video." }
                     ModuleTab("Reel Recreator", module == "reel", Modifier.weight(1f)) { module = "reel"; status = "Choose a reference Reel from your phone." }
                 }
 
@@ -138,13 +138,13 @@ private fun CricketAnalysisModule(
     Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(22.dp)) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
             Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Accent, modifier = Modifier.size(30.dp))
-            Text("Preet Sports · YouTube Cricket Analysis", fontWeight = FontWeight.Bold, fontSize = 19.sp)
-            Text("Paste an ICC, Cricbuzz, CREX or other match-page URL. The planned engine will research match information and prepare an original analysis video.", color = Muted, fontSize = 13.sp, lineHeight = 19.sp)
+            Text("Upcoming Match · YouTube Pre-Analysis", fontWeight = FontWeight.Bold, fontSize = 19.sp)
+            Text("Choose an upcoming fixture by pasting its ICC, Cricbuzz or CREX match URL. The research engine will verify match details before preparing your original Preet Sports analysis.", color = Muted, fontSize = 13.sp, lineHeight = 19.sp)
             OutlinedTextField(
                 value = matchUrl,
                 onValueChange = onMatchUrlChange,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Match URL") },
+                label = { Text("Upcoming match URL") },
                 placeholder = { Text("https://...") },
                 singleLine = false,
                 minLines = 2,
@@ -172,7 +172,7 @@ private fun CricketAnalysisModule(
                 onClick = onPrepare,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(16.dp)
-            ) { Text("Prepare Cricket Analysis", fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+            ) { Text("Prepare Match Pre-Analysis", fontSize = 15.sp, fontWeight = FontWeight.Bold) }
             Text(status, color = Muted, fontSize = 12.sp)
             Text("Original analysis only. Check source accuracy and use footage/music you are licensed to publish.", color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
         }
