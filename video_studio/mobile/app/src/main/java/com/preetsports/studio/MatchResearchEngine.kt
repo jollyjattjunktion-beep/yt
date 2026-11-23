@@ -99,7 +99,7 @@ class MatchResearchEngine(private val importer: MatchUrlImporter = MatchUrlImpor
         if (crexText.isNotBlank()) {
             val fixtureDate = Regex("(?i)\\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\\s+\\d{1,2}\\s+[A-Za-z]+,?\\s+\\d{1,2}:\\d{2}\\s*(?:AM|PM)\\b").find(crexText)?.value
             if (fixtureDate != null) addCrexFact("Match date/time", fixtureDate)
-            val ground = Regex("(?i)\\b([A-Za-z][A-Za-z .'-]{2,45}\\b(?:Oval|Stadium|Ground|Park|Cricket Ground),\\s*[A-Za-z .'-]+,\\s*[A-Za-z .'-]+)\\b").find(crexText)?.groupValues?.getOrNull(1)?.trim()
+            val ground = Regex("(?i)\\b((?:AM\\s+)?[A-Za-z][A-Za-z .'-]{2,45}\\b(?:Oval|Stadium|Ground|Park|Cricket Ground),\\s*[A-Za-z .'-]+,\\s*[A-Za-z .'-]+)\\b").find(crexText)?.groupValues?.getOrNull(1)?.trim()?.removePrefix("AM ")
             if (ground != null) addCrexFact("Venue", ground)
             val h2h = Regex("(?is)(?:AUS\\s+vs\\s+ENG|ENG\\s+vs\\s+AUS)\\s+Head to Head\\s+\\(Last 10 matches\\).*?\\b(\\d{1,2})\\s*-\\s*(\\d{1,2})\\b").find(crexText)
             if (h2h != null) addCrexFact("Head-to-head (last 10)", "AUS ${h2h.groupValues[1]} wins – ENG ${h2h.groupValues[2]} wins", h2h.value)
