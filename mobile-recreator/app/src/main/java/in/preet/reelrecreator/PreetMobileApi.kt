@@ -31,7 +31,7 @@ object PreetMobileApi {
                 .addFormDataPart("format", "Test")
                 .addFormDataPart("duration_minutes", "10")
                 .addFormDataPart("language", "Roman Hinglish")
-                .addFormDataPart("tts_provider", "edge")
+                .addFormDataPart("tts_provider", "both")
                 .addFormDataPart("voice", "hi-IN-MadhurNeural")
             screenshots.take(10).forEachIndexed { index, uri ->
                 val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
