@@ -267,7 +267,7 @@ private fun StudioHome(
         Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("03 · Script and voice settings", color = Gold, fontWeight = FontWeight.Bold)
-                Text("Gemini generates the Roman Hinglish cricket pre-analysis script only. Android Text-to-Speech on this phone creates the narration locally. No APInex or Gemini TTS voice service is used.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+                Text("Script generation runs locally on this phone using saved match research and scorecard data. No Gemini API key or internet is required after match data has been saved. Android System TTS creates narration locally. Optional Gemini online fallback is not required.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
                 OutlinedTextField(
                     value = scriptApiKey,
                     onValueChange = { entered ->
@@ -351,33 +351,28 @@ private fun StudioHome(
                 Text("04 · Generate and review script", color = Gold, fontWeight = FontWeight.Bold)
                 Text("Generate the Roman Hinglish script separately, review or edit it, then run voice and video production. The script is saved in the project folder.", color = Color.LightGray)
                 Button(
-                    enabled = !busy && match.isNotBlank() && (scriptKeySaved || scriptApiKey.isNotBlank()),
+                    enabled = !busy && match.isNotBlank(),
                     onClick = {
                         busy = true
-                        notice = "Generating Roman Hinglish script with Gemini…"
+                        notice = "Building Roman Hinglish script offline on this phone…"
                         scope.launch {
                             try {
-                                val key = scriptApiKey.trim().ifBlank { activeScriptKey }
                                 val project = if (researchProjectPath.isNotBlank() && java.io.File(researchProjectPath).isDirectory)
                                     java.io.File(researchProjectPath) else LocalProjectStore(context).createProject(match)
-                                val report = researchReport ?: MatchResearchEngine().research(iccUrl, cricbuzzUrl, pitchSourceUrl, h2hSourceUrl).also {
-                                    researchReport = it
-                                    it.save(java.io.File(project, "research-report.json"))
-                                    java.io.File(project, "match-research.txt").writeText(it.toPromptContext())
-                                }
                                 researchProjectPath = project.absolutePath
                                 val minutes = duration.substringBefore(" ").toIntOrNull() ?: 5
-                                val generated = GeminiClient(key)
-                                    .createScript(match, format, minutes, report.toPromptContext(), activeScriptModel)
+                                val generated = OfflineScriptComposer.generate(
+                                    match, format, minutes, researchReport, importedSquads, playerFormPreview
+                                )
                                 scriptText = generated
                                 LocalProjectStore(context).saveScript(project, match, format, generated)
-                                notice = "Script generated and saved. Review or edit it below before voice generation."
+                                notice = "Offline script generated and saved. Review or edit it below before voice generation."
                             } catch (e: Exception) {
-                                notice = "Script generation failed: ${e.message ?: "Unknown error"}"
+                                notice = "Offline script generation failed: ${e.message ?: "Unknown error"}"
                             } finally { busy = false }
                         }
                     }, modifier = Modifier.fillMaxWidth()
-                ) { Text(if (busy) "Generating script…" else "Generate Roman Hinglish script") }
+                ) { Text(if (busy) "Generating offline script…" else "Generate script offline — no API key") }
                 OutlinedTextField(
                     value = scriptText,
                     onValueChange = { scriptText = it },
@@ -415,7 +410,7 @@ private fun StudioHome(
                         when {
                             match.isBlank() -> notice = "Enter a match name to start."
                             iccUrl.isBlank() && cricbuzzUrl.isBlank() -> notice = "Add at least one ICC or Cricbuzz URL before starting research."
-                            scriptText.isBlank() && !(scriptKeySaved || scriptApiKey.isNotBlank()) -> notice = "Enter your Gemini Script API key to generate the script."
+                            scriptText.isBlank() -> notice = "Generate and review your offline script in section 04 before starting production."
                             else -> {
                                 busy = true
                                 notice = "STAGE 1/3 — Researching both match sources…"
