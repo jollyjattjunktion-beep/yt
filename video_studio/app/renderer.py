@@ -1,6 +1,6 @@
 import asyncio, json, re, shutil, subprocess
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 from .config import settings
 from .gemini_tts import synthesize
 
@@ -48,6 +48,45 @@ def make_card(path: Path,size: tuple[int,int],title: str,subtitle: str,index: in
     d.rectangle((int(w*.06),int(h*.87),int(w*.94),int(h*.875)),fill=(232,177,76))
     img.save(path,quality=93)
 
+def make_ai_card(background: Path, path: Path, size: tuple[int,int], title: str, subtitle: str, index: int):
+    image = Image.open(background).convert("RGB")
+    image = ImageOps.fit(image, size, method=Image.Resampling.LANCZOS)
+    image = image.convert("RGBA")
+    overlay = Image.new("RGBA", size, (3, 12, 24, 72))
+    image = Image.alpha_composite(image, overlay)
+    draw = ImageDraw.Draw(image)
+    w, h = size
+    draw.rounded_rectangle((int(w*.045), int(h*.055), int(w*.955), int(h*.945)),
+                           radius=max(12, int(w*.018)), outline=(226, 184, 102, 220),
+                           width=max(2, int(w*.002)))
+    draw.text((int(w*.075), int(h*.105)), "PREET SPORTS", font=font(max(22, int(w*.032))),
+              fill=(247, 205, 123, 255))
+    draw.text((int(w*.075), int(h*.205)), f"{index:02d}  MATCH ANALYSIS",
+              font=font(max(18, int(w*.022))), fill=(220, 230, 239, 255))
+    words = title.split()
+    lines, line = [], ""
+    max_chars = 24 if h > w else 32
+    for word in words:
+        if len(line + " " + word) > max_chars and line:
+            lines.append(line)
+            line = word
+        else:
+            line = (line + " " + word).strip()
+    if line:
+        lines.append(line)
+    y = int(h*.34)
+    for part in lines[:4]:
+        draw.text((int(w*.075), y), part, font=font(max(26, int(w*.052))),
+                  fill=(255, 255, 255, 255), stroke_width=max(1, int(w*.0015)),
+                  stroke_fill=(0, 0, 0, 220))
+        y += int(h*.075)
+    draw.rounded_rectangle((int(w*.075), int(h*.78), int(w*.925), int(h*.89)),
+                           radius=max(8, int(w*.012)), fill=(4, 15, 28, 190))
+    draw.text((int(w*.095), int(h*.815)), subtitle[:110],
+              font=font(max(15, int(w*.019))), fill=(230, 237, 244, 255))
+    image.convert("RGB").save(path, quality=94)
+
+
 def media_duration(path: Path) -> float:
     probe=shutil.which("ffprobe")
     if not probe: raise RuntimeError("ffprobe not found. Install FFmpeg and add it to PATH.")
@@ -92,7 +131,7 @@ def research_scenes(research: dict,match_name: str):
       ("HEAD TO HEAD",h2h_line),("MATCH PREDICTION",prediction_line),
       ("PREET SPORTS","Roman Hinglish cricket analysis")]
 
-async def render_video(script: str,match_name: str,job_dir: Path,voice: str|None=None,research: dict|None=None,scenes: list[dict]|None=None,tts_provider: str|None=None):
+async def render_video(script: str,match_name: str,job_dir: Path,voice: str|None=None,research: dict|None=None,scenes: list[dict]|None=None,tts_provider: str|None=None,scene_images: list[str]|None=None):
     if not shutil.which(settings.ffmpeg_bin) and not Path(settings.ffmpeg_bin).exists():
         raise RuntimeError("FFmpeg not found. Install FFmpeg and add its bin folder to PATH.")
     job_dir.mkdir(parents=True,exist_ok=True)
@@ -108,7 +147,10 @@ async def render_video(script: str,match_name: str,job_dir: Path,voice: str|None
             for i,scene in enumerate(scenes):
                 title=scene.get("title","MATCH ANALYSIS")
                 sub=scene.get("subtitle","")
-                p=cards/f"scene-{i:02d}.jpg"; make_card(p,size,title,sub,i+1)
+                p=cards/f"scene-{i:02d}.jpg"
+                bg = Path(scene_images[i]) if scene_images and i < len(scene_images) else None
+                if bg and bg.is_file(): make_ai_card(bg,p,size,title,sub,i+1)
+                else: make_card(p,size,title,sub,i+1)
                 f.write(f"file '{p.resolve().as_posix()}'\nduration {durations[i]}\n")
             f.write(f"file '{(cards/f'scene-{len(scenes)-1:02d}.jpg').resolve().as_posix()}'\n")
         out=job_dir/f"preet-sports-{suffix}.mp4"
