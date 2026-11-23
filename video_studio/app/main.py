@@ -39,15 +39,12 @@ def health():
 def read_settings():
     return {"gemini_api_key_set":bool(settings.gemini_api_key),
       "gemini_api_key_masked":("••••••••"+settings.gemini_api_key[-4:]) if settings.gemini_api_key else "",
-      "gemini_model":settings.gemini_model,"gemini_tts_model":settings.gemini_tts_model,
-      "gemini_tts_voice":settings.gemini_tts_voice,"tts_provider":settings.tts_provider,
+      "gemini_model":settings.gemini_model,"tts_provider":settings.tts_provider,
       "edge_tts_voice":settings.edge_tts_voice,"cricket_data_api_url":settings.cricket_data_api_url}
 
 class SettingsRequest(BaseModel):
     gemini_api_key:str=""
     gemini_model:str="gemini-3.8-flash"
-    gemini_tts_model:str="gemini-2.5-flash-preview-tts"
-    gemini_tts_voice:str="Charon"
     tts_provider:str="edge"
     edge_tts_voice:str="hi-IN-MadhurNeural"
     cricket_data_api_url:str=""
@@ -69,7 +66,6 @@ def save_settings(req:SettingsRequest):
             if "=" in line and not line.lstrip().startswith("#"):
                 k,v=line.split("=",1); existing[k]=v
     values={"GEMINI_API_KEY":req.gemini_api_key.strip(),"GEMINI_MODEL":req.gemini_model.strip(),
-      "GEMINI_TTS_MODEL":req.gemini_tts_model.strip(),"GEMINI_TTS_VOICE":req.gemini_tts_voice.strip(),
       "TTS_PROVIDER":req.tts_provider.strip(),"EDGE_TTS_VOICE":req.edge_tts_voice.strip(),
       "CRICKET_DATA_API_URL":req.cricket_data_api_url.strip(),"CRICKET_DATA_API_KEY":req.cricket_data_api_key.strip()}
     for k,v in values.items():
