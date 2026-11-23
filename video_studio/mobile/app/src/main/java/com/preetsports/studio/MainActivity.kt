@@ -279,10 +279,10 @@ private fun StudioHome(
                             notice = "Gemini script key saved on this device."
                         }
                     },
-                    label = { Text("Gemini API key — script generation only") },
+                    label = { Text("Optional Gemini API key — online fallback only") },
                     modifier = Modifier.fillMaxWidth(), singleLine = true
                 )
-                Text(if (scriptKeySaved) "✓ Gemini script key saved." else "Required only when generating a new match-analysis script.", color = if (scriptKeySaved) Gold else Color.LightGray)
+                Text(if (scriptKeySaved) "Optional Gemini key saved. Offline script generation does not use it." else "No API key required. Leave this empty for fully offline script generation.", color = Color.LightGray)
                 OutlinedTextField(
                     value = scriptModelInput,
                     onValueChange = { entered ->
@@ -293,7 +293,7 @@ private fun StudioHome(
                             notice = "Gemini script model saved: ${entered.trim()}"
                         }
                     },
-                    label = { Text("Gemini script model ID") },
+                    label = { Text("Optional Gemini model ID — online fallback") },
                     placeholder = { Text("gemini-3.8-flash") },
                     modifier = Modifier.fillMaxWidth(), singleLine = true
                 )
