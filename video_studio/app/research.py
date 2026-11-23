@@ -96,8 +96,12 @@ async def research_match(match_name: str, supplied_facts: dict,
                          source_url: str | None = None,
                          screenshot_paths: list[str] | None = None) -> dict:
     page_text = ""
+    page_error = None
     if source_url:
-        page_text = await _fetch_match_page(source_url)
+        try:
+            page_text = await _fetch_match_page(source_url)
+        except Exception as exc:
+            page_error = str(exc)[:500]
     screenshot_facts = await _extract_screenshot_facts(screenshot_paths or [])
     facts = dict(supplied_facts or {})
     # Screenshot extraction fills missing fields only; explicit user facts are retained.
@@ -106,10 +110,12 @@ async def research_match(match_name: str, supplied_facts: dict,
             facts[key] = value
     if page_text:
         facts.setdefault("source_page_text", page_text)
+    if page_error:
+        facts["source_page_warning"] = page_error
     if not facts and not settings.cricket_data_api_url:
         return {"match_name": match_name, "facts": {}, "source": source_url,
                 "verified": False, "verification_status": "no_extractable_facts",
-                "warning": "No readable match facts were extracted. Review the URL or upload clear screenshots."}
+                "warning": "No readable match facts were extracted. Review the URL or upload clear screenshots.", "page_error": page_error}
     if not facts and settings.cricket_data_api_url:
         headers = {}
         if settings.cricket_data_api_key:
