@@ -9,17 +9,11 @@ class Settings(BaseSettings):
     data_dir: Path = Path("./data")
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.8-flash"
-    gemini_image_model: str = "gemini-nano-banana-2.1"
+    # Gemini is used for text analysis/scriptwriting within the user's available free quota.
     colab_image_worker_url: str = ""
     colab_worker_token: str = ""
     colab_image_timeout_seconds: int = 300
-    gemini_tts_model: str = "gemini-2.5-flash-preview-tts"
-    gemini_tts_voice: str = "Charon"
-    tts_fallback_order: str = "vexyl,indicvoice,edge"
-    vexyl_tts_url: str = ""
-    vexyl_tts_api_key: str = ""
-    vexyl_tts_language: str = "hi-IN"
-    vexyl_tts_style: str = "formal"
+    tts_fallback_order: str = "indicvoice,edge"
     indicvoice_enabled: bool = True
     tts_provider: str = "both"
     edge_tts_voice: str = "hi-IN-MadhurNeural"
@@ -32,7 +26,6 @@ class Settings(BaseSettings):
     @field_validator("gemini_model", mode="before")
     @classmethod
     def migrate_legacy_gemini_model(cls, value):
-        # Older local .env files and saved dashboard settings may still contain this model.
         legacy = {"gemini-2.5-flash", "models/gemini-2.5-flash"}
         if isinstance(value, str) and value.strip() in legacy:
             return "gemini-3.8-flash"
@@ -43,6 +36,6 @@ settings.output_dir.mkdir(parents=True, exist_ok=True)
 settings.data_dir.mkdir(parents=True, exist_ok=True)
 
 def reload_settings():
-    fresh=Settings()
-    for key,value in fresh.__dict__.items():
-        setattr(settings,key,value)
+    fresh = Settings()
+    for key, value in fresh.__dict__.items():
+        setattr(settings, key, value)
