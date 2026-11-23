@@ -46,7 +46,7 @@ async def _fetch_match_page(source_url: str) -> str:
             raise ValueError("Match page redirected outside the permitted cricket domains.")
         parser = VisibleText()
         parser.feed(response.text[:3_000_000])
-        return re.sub(r"\\s+", " ", " ".join(parser.parts))[:24000]
+        return re.sub(r"\s+", " ", " ".join(parser.parts))[:24000]
 
 
 async def _extract_screenshot_facts(paths: list[str]) -> dict:
