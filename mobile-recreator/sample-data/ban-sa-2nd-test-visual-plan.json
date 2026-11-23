@@ -1,0 +1,115 @@
+{
+  "match": {
+    "title": "BAN vs SA, 2nd Test",
+    "tour": "Bangladesh tour of South Africa 2026",
+    "teams": [
+      "South Africa",
+      "Bangladesh"
+    ],
+    "status_on_source": "Toss delay due to rain",
+    "venue": "SuperSport Park, Centurion",
+    "source_url": "https://crex.com/cricket-live-score/ban-vs-sa-2nd-test-bangladesh-tour-of-south-africa-2026-match-updates-10MA/match-details",
+    "source_note": "Values transcribed from user-provided CREX screenshots. The page URL could not be independently fetched in this run; re-verify live facts before publishing."
+  },
+  "weather": {
+    "condition": "Cloudy",
+    "temperature_c": 18.9,
+    "humidity_percent": 93,
+    "rain_chance_percent": 65
+  },
+  "venue_stats": {
+    "matches": 20,
+    "win_bat_first_percent": 55,
+    "win_bowl_first_percent": 35,
+    "average_innings": {
+      "first": 327,
+      "second": 337,
+      "third": 224,
+      "fourth": 106
+    },
+    "highest_total": {
+      "score": "621/10",
+      "overs": "142.1",
+      "team": "South Africa",
+      "opponent": "Sri Lanka"
+    },
+    "lowest_total": {
+      "score": "101/10",
+      "overs": "34.4",
+      "team": "England",
+      "opponent_visible_as": "S…",
+      "note": "Opponent is cut off in screenshot; do not complete by guessing."
+    }
+  },
+  "team_comparison_overall": {
+    "matches_played": {
+      "south_africa": 10,
+      "bangladesh": 10
+    },
+    "win_percent": {
+      "south_africa": 80,
+      "bangladesh": 30
+    },
+    "average_score": {
+      "south_africa": 396,
+      "bangladesh": 298
+    },
+    "highest_score": {
+      "south_africa": 626,
+      "bangladesh": 426
+    },
+    "lowest_score": {
+      "south_africa": 159,
+      "bangladesh": 64
+    }
+  },
+  "head_to_head": {
+    "period_label": "Last 10 matches",
+    "displayed_record": "South Africa 8 - 0 Bangladesh",
+    "recent_match": {
+      "label": "1st Test, BAN vs SA 2026",
+      "south_africa": "557 & 12/1",
+      "bangladesh": "400 & 168",
+      "result": "South Africa won by 9 wickets"
+    },
+    "other_visible_match": {
+      "label": "2nd Test, SA vs BAN 2024",
+      "bangladesh": "159 & 143",
+      "south_africa": "575/6 declared (144.2 overs)",
+      "result": "South Africa won by an innings and 273 runs"
+    }
+  },
+  "recent_form_visible": {
+    "south_africa": [
+      "W",
+      "W",
+      "W",
+      "L",
+      "W"
+    ],
+    "bangladesh": [
+      "L",
+      "D",
+      "L",
+      "D",
+      "L"
+    ]
+  },
+  "unavailable_from_attached_screenshots": [
+    "confirmed playing XIs",
+    "player-level recent form and career statistics",
+    "official match date and start time",
+    "complete lowest-total opponent name",
+    "verified current pitch report beyond venue innings statistics"
+  ],
+  "proposed_visual_sequence": [
+    "match_intro",
+    "weather_and_conditions",
+    "venue_innings_profile",
+    "team_comparison",
+    "head_to_head",
+    "recent_team_form",
+    "key_players_if_squad_data_is_verified",
+    "pre_match_takeaways"
+  ]
+}
