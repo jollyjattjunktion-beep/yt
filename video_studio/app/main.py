@@ -72,7 +72,6 @@ def save_settings(req:SettingsRequest):
         if v or k not in existing: existing[k]=v
     env_path.write_text("\n".join(f"{k}={v}" for k,v in existing.items())+"\n",encoding="utf-8")
     for attr,key in [("gemini_api_key","GEMINI_API_KEY"),("gemini_model","GEMINI_MODEL"),
-      ("gemini_tts_model","GEMINI_TTS_MODEL"),("gemini_tts_voice","GEMINI_TTS_VOICE"),
       ("tts_provider","TTS_PROVIDER"),("edge_tts_voice","EDGE_TTS_VOICE"),
       ("cricket_data_api_url","CRICKET_DATA_API_URL"),("cricket_data_api_key","CRICKET_DATA_API_KEY")]:
         setattr(settings,attr,existing.get(key,""))
