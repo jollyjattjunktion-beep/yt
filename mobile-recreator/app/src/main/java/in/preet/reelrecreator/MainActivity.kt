@@ -14,6 +14,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -42,11 +44,16 @@ private fun PreetApp() {
     var replacementAudioUri by remember { mutableStateOf<Uri?>(null) }
     var mode by remember { mutableStateOf("same_song") }
     var matchUrl by remember { mutableStateOf("") }
+    var matchScreenshots by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var status by remember { mutableStateOf("Paste a match URL to prepare a Preet Sports analysis video.") }
 
     val videoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri -> referenceUri = uri; if (uri != null) status = "Reference Reel selected." }
+
+    val screenshotPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris -> matchScreenshots = uris; if (uris.isNotEmpty()) status = "${uris.size} match screenshots selected." }
 
     val audioPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -80,12 +87,15 @@ private fun PreetApp() {
                     CricketAnalysisModule(
                         matchUrl = matchUrl,
                         onMatchUrlChange = { matchUrl = it },
+                        screenshotCount = matchScreenshots.size,
+                        onPickScreenshots = { screenshotPicker.launch(arrayOf("image/*")) },
                         status = status,
                         onPrepare = {
                             status = when {
                                 matchUrl.isBlank() -> "Paste a match URL first."
                                 !matchUrl.startsWith("https://") && !matchUrl.startsWith("http://") -> "Please enter a valid http(s) match URL."
-                                else -> "Match URL saved in the form. Connect the Preet Sports research and rendering API to start analysis."
+                                screenshotCount == 0 -> "Match URL entered. Attach CREX page screenshots too if the page cannot be read automatically."
+                                else -> "Match URL and $screenshotCount screenshots selected. Connect the research and image-rendering API to generate graphics."
                             }
                         }
                     )
@@ -132,6 +142,8 @@ private fun ModuleTab(title: String, selected: Boolean, modifier: Modifier = Mod
 private fun CricketAnalysisModule(
     matchUrl: String,
     onMatchUrlChange: (String) -> Unit,
+    screenshotCount: Int,
+    onPickScreenshots: () -> Unit,
     status: String,
     onPrepare: () -> Unit
 ) {
@@ -159,6 +171,24 @@ private fun CricketAnalysisModule(
                     cursorColor = Accent
                 )
             )
+            HorizontalDivider(color = Color(0xFF343A4A))
+            Text("MATCH VISUALS FROM CREX", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+            Text("Paste the match-details URL and attach saved page screenshots. The visual engine will turn verified facts into clean, original 16:9 graphics—not reuse CREX screenshots as video frames.", color = Muted, fontSize = 12.sp, lineHeight = 18.sp)
+            OutlinedButton(onClick = onPickScreenshots, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.Image, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(if (screenshotCount == 0) "Attach match-page screenshots" else "Screenshots attached: $screenshotCount")
+            }
+            Text("PLANNED GRAPHIC SEQUENCE", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+            VisualSlideLine("01", "Match introduction", "Teams · format · venue · date")
+            VisualSlideLine("02", "Pitch & venue report", "Innings averages · batting / bowling first")
+            VisualSlideLine("03", "Weather conditions", "Cloud cover · rain chance · humidity")
+            VisualSlideLine("04", "Team comparison", "Win rate · average score · highest / lowest")
+            VisualSlideLine("05", "Head-to-head", "Previous meetings and series results")
+            VisualSlideLine("06", "Recent team form", "Last five results")
+            VisualSlideLine("07", "Key players & matchups", "Squad-confirmed player analysis")
+            VisualSlideLine("08", "Fantasy analysis", "Role balance · risk · captaincy options")
+            Text("Visual style: Preet Sports broadcast graphics · cinematic cricket backgrounds · readable data overlays.", color = Muted, fontSize = 12.sp, lineHeight = 18.sp)
             Text("VIDEO SETTINGS", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
             SettingLine("Content", "Analysis + Fantasy")
             SettingLine("Script", "Roman Hinglish")
@@ -175,6 +205,19 @@ private fun CricketAnalysisModule(
             ) { Text("Prepare Match Pre-Analysis", fontSize = 15.sp, fontWeight = FontWeight.Bold) }
             Text(status, color = Muted, fontSize = 12.sp)
             Text("Original analysis only. Check source accuracy and use footage/music you are licensed to publish.", color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
+        }
+    }
+}
+
+@Composable
+private fun VisualSlideLine(number: String, title: String, detail: String) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Surface(color = Color(0xFF252B42), shape = RoundedCornerShape(8.dp)) {
+            Text(number, modifier = Modifier.padding(horizontal = 9.dp, vertical = 7.dp), color = Accent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Text(detail, color = Muted, fontSize = 11.sp)
         }
     }
 }
