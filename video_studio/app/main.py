@@ -97,7 +97,7 @@ async def create_mobile_job(
     format: str = Form(default="Test"),
     duration_minutes: int = Form(default=10),
     language: str = Form(default="Roman Hinglish"),
-    tts_provider: str = Form(default="edge"),
+    tts_provider: str = Form(default="both"),
     voice: str = Form(default="hi-IN-MadhurNeural"),
     screenshots: list[UploadFile] = File(default=[])
 ):
