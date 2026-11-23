@@ -1,6 +1,22 @@
 package `in`.preet.reelrecreator
 
 import android.net.Uri
+import android.app.DownloadManager
+import android.content.Context
+import android.os.Environment
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import java.util.concurrent.TimeUnit
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -45,6 +61,9 @@ private fun PreetApp() {
     var matchUrl by remember { mutableStateOf("") }
     var matchScreenshots by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var status by remember { mutableStateOf("Paste a match URL to prepare a Preet Sports analysis video.") }
+    var isPreparing by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     val videoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
