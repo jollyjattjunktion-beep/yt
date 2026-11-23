@@ -14,7 +14,7 @@ async def process(job):
         reload_settings()
         req=MatchRequest.model_validate_json(job["payload"])
         update_job(job_id,status="running",stage="Researching match",progress=8)
-        research=await research_match(req.match_name,req.match_facts)
+        research=await research_match(req.match_name,req.match_facts,req.source_url,req.screenshot_paths)
         update_job(job_id,stage=f"Writing {req.duration_minutes}-minute Roman Hinglish script",progress=20)
         script=await generate_script(req.match_name,research,req.duration_minutes,req.language)
         folder=settings.output_dir/safe_name(req.match_name)/job_id
