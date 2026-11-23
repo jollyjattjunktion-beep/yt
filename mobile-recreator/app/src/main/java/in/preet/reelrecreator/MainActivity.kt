@@ -221,12 +221,12 @@ private fun CricketAnalysisModule(
             Text("VIDEO SETTINGS", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
             SettingLine("Content", "Analysis + Fantasy")
             SettingLine("Script", "Roman Hinglish")
-            SettingLine("Narration", "Mithi v2 Flash · Indian male voice")
+            SettingLine("Narration", "Mithi v2 Flash · provider integration pending")
             SettingLine("Format", "16:9 · 1920 × 1080")
             SettingLine("Rendering", "Cloud FFmpeg")
             HorizontalDivider(color = Color(0xFF343A4A))
-            Text("Planned automatic workflow", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            Text("Match research → verified facts → Gemini script → voiceover → scene plan → visuals → captions → final MP4", color = Muted, fontSize = 12.sp, lineHeight = 18.sp)
+            Text("One-button automatic workflow", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text("Phone upload → source extraction → Gemini Roman Hinglish script → AI scene artwork → narration → captions → FFmpeg 1080p MP4 → phone download", color = Muted, fontSize = 12.sp, lineHeight = 18.sp)
             Button(
                 onClick = onPrepare,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
