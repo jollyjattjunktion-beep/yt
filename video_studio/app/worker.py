@@ -24,7 +24,7 @@ async def process(job):
         update_job(job_id,stage="Planning sports-broadcast scenes with Gemini",progress=32)
         # Scene timing is derived from actual audio duration after TTS; plan uses an estimate.
         scenes=await plan_scenes(req.match_name,script,research,req.duration_minutes*60)
-        update_job(job_id,stage="Generating 8–12 original cricket scene images with Gemini",progress=38)
+        update_job(job_id,stage="Generating 8–12 original cricket scene images with free Colab SDXL Turbo",progress=38)
         scene_images=await generate_scene_backgrounds(req.match_name,scenes,folder/"ai-scenes")
         update_job(job_id,stage="Generating narration and rendering 1080p sports video",progress=55)
         result=await render_video(script,req.match_name,folder,req.voice,research=research,scenes=scenes,tts_provider=req.tts_provider,scene_images=scene_images)
