@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     data_dir: Path = Path("./data")
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.8-flash"
+    gemini_image_model: str = "gemini-nano-banana-2.1"
     gemini_tts_model: str = "gemini-2.5-flash-preview-tts"
     gemini_tts_voice: str = "Charon"
     tts_provider: str = "edge"
