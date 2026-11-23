@@ -46,16 +46,25 @@ class AndroidHinglishTts(private val context: Context) {
                 files += segment
             }
             onProgress("Combining ${files.size} voice segments into the final WAV…")
-            val manifest = File(workDir, "segments.txt")
-            manifest.writeText(files.joinToString("\n") { "file '${it.absolutePath.replace("'", "'\\''")}'" } + "\n")
-            val command = listOf(
-                "-y", "-hide_banner", "-loglevel", "error", "-f", "concat", "-safe", "0",
-                "-i", quote(manifest.absolutePath), "-vn", "-ac", "1", "-ar", "24000",
-                "-c:a", "pcm_s16le", quote(outputWav.absolutePath)
-            ).joinToString(" ")
-            val session = withContext(Dispatchers.IO) { FFmpegKit.execute(command) }
-            require(ReturnCode.isSuccess(session.returnCode) && outputWav.isFile && outputWav.length() > 44L) {
-                "Could not assemble Android TTS audio: ${session.allLogsAsString.takeLast(700)}"
+            if (files.size == 1) {
+                // A short voice preview is normally one segment. Copy the WAV directly:
+                // avoid starting FFmpeg/native codecs just to preview a single sentence.
+                withContext(Dispatchers.IO) { files.single().copyTo(outputWav, overwrite = true) }
+            } else {
+                val manifest = File(workDir, "segments.txt")
+                manifest.writeText(files.joinToString("\n") { "file '${it.absolutePath.replace("'", "'\\''")}'" } + "\n")
+                val command = listOf(
+                    "-y", "-hide_banner", "-loglevel", "error", "-f", "concat", "-safe", "0",
+                    "-i", quote(manifest.absolutePath), "-vn", "-ac", "1", "-ar", "24000",
+                    "-c:a", "pcm_s16le", quote(outputWav.absolutePath)
+                ).joinToString(" ")
+                val session = withContext(Dispatchers.IO) { FFmpegKit.execute(command) }
+                require(ReturnCode.isSuccess(session.returnCode)) {
+                    "Could not assemble Android TTS audio: ${session.allLogsAsString.takeLast(700)}"
+                }
+            }
+            require(outputWav.isFile && outputWav.length() > 44L) {
+                "Android TTS output WAV is missing or empty."
             }
             onProgress("On-device Hinglish voiceover ready.")
             return outputWav
