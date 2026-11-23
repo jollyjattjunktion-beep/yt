@@ -1,68 +1,49 @@
-"""Generate original, text-free cricket scene backgrounds with Gemini image generation."""
-import asyncio
-import base64
+"""AI scene image provider: authenticated free Colab worker, with clear fallback behavior."""
+import asyncio, base64, re
 from pathlib import Path
 import httpx
 from .config import settings
 
 
-async def generate_scene_backgrounds(match_name: str, scenes: list[dict], output_dir: Path) -> list[str]:
-    if not settings.gemini_api_key:
-        raise RuntimeError("Gemini API key is required for original cricket scene image generation.")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    model = settings.gemini_image_model
-    endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    outputs = []
-    async with httpx.AsyncClient(timeout=httpx.Timeout(180, connect=25)) as client:
-        for index, scene in enumerate(scenes[:12], start=1):
-            title = str(scene.get("title", "Cricket analysis"))[:80]
-            subtitle = str(scene.get("subtitle", ""))[:160]
-            prompt = f"""Create one premium, cinematic cricket broadcast background image for Preet Sports.
-Match context: {match_name}. Scene: {title}. Supporting context: {subtitle}.
-Visual direction: photorealistic professional cricket photography, dramatic but natural stadium lighting,
-deep navy and muted gold palette, rich realistic grass and pitch textures, crisp details, atmospheric depth,
-professional sports documentary art direction. Use a new original composition, no recognizable real player,
-no copyrighted team logo, no sponsor marks, no text, no numbers, no watermark, no UI.
-Compose with clean negative space across the upper third and lower third for later readable typography.
-Wide landscape 16:9 image, broadcast-quality, natural color grading, not plastic or cartoon-like."""
-            response = await client.post(
-                endpoint,
-                params={"key": settings.gemini_api_key},
-                json={
-                    "contents": [{"parts": [{"text": prompt}]}],
-                    "generationConfig": {
-                        "responseModalities": ["TEXT", "IMAGE"],
-                        "imageConfig": {"aspectRatio": "16:9"}
-                    }
-                }
-            )
-            if response.is_error:
-                raise RuntimeError(
-                    f"Gemini image generation failed for scene {index} ({response.status_code}): "
-                    + response.text[:900]
-                )
-            data = response.json()
-            image_bytes = None
-            mime = "image/png"
-            try:
-                parts = data["candidates"][0]["content"]["parts"]
-                for part in parts:
-                    inline = part.get("inlineData") or part.get("inline_data")
-                    if inline and inline.get("data"):
-                        image_bytes = base64.b64decode(inline["data"])
-                        mime = inline.get("mimeType") or inline.get("mime_type") or mime
-                        break
-            except (KeyError, IndexError, TypeError):
-                pass
-            if not image_bytes:
-                raise RuntimeError(f"Gemini returned no image for scene {index}. Check image-model access and quota.")
-            extension = ".jpg" if "jpeg" in mime else ".png"
-            target = output_dir / f"ai-scene-{index:02d}{extension}"
-            target.write_bytes(image_bytes)
-            outputs.append(str(target))
-            # Avoid burst traffic and stay within conservative free-tier request pacing.
-            if index < min(12, len(scenes)):
-                await asyncio.sleep(1.0)
-    if len(outputs) < 8:
-        raise RuntimeError(f"Only {len(outputs)} AI scene images were generated; at least 8 are required.")
+def _prompt(match_name: str, scene: dict) -> str:
+    title=str(scene.get("title","Cricket analysis"))[:80]
+    subtitle=str(scene.get("subtitle",""))[:160]
+    return f"""Create one original cinematic cricket broadcast background for Preet Sports.
+Match: {match_name}. Scene: {title}. Context: {subtitle}.
+Photorealistic cricket stadium photography, natural lighting, navy and muted gold broadcast palette,
+realistic pitch and grass, professional sports documentary, no recognizable real players, no team logos,
+no sponsor marks, no text, no numbers, no watermark. Wide landscape 16:9, negative space for titles."""
+
+
+async def _colab_images(match_name: str, scenes: list[dict], output_dir: Path) -> list[str]:
+    base=(settings.colab_image_worker_url or "").rstrip("/")
+    token=settings.colab_worker_token
+    if not base or not token:
+        raise RuntimeError("Colab image worker is not connected. Set COLAB_IMAGE_WORKER_URL and COLAB_WORKER_TOKEN.")
+    output_dir.mkdir(parents=True,exist_ok=True)
+    prompts=[_prompt(match_name,s) for s in scenes[:12]]
+    async with httpx.AsyncClient(timeout=httpx.Timeout(settings.colab_image_timeout_seconds,connect=20)) as client:
+        response=await client.post(base+"/generate",headers={"Authorization":f"Bearer {token}"},
+          json={"prompts":prompts,"width":1024,"height":576,"steps":4})
+        if response.is_error:
+            raise RuntimeError(f"Colab worker returned {response.status_code}: {response.text[:600]}")
+        data=response.json()
+    images=data.get("images",[])
+    if len(images)<8:
+        raise RuntimeError(f"Colab worker returned {len(images)} images; at least 8 are required.")
+    outputs=[]
+    for i,item in enumerate(images[:12],1):
+        raw=base64.b64decode(item["data"],validate=True)
+        if len(raw)>15*1024*1024: raise RuntimeError(f"Colab image {i} exceeds 15 MB.")
+        if not raw.startswith(b"\\x89PNG\\r\\n\\x1a\\n") and not raw.startswith(b"\\xff\\xd8"):
+            raise RuntimeError(f"Colab image {i} is not a valid PNG/JPEG.")
+        ext=".png" if raw.startswith(b"\\x89PNG") else ".jpg"
+        path=output_dir/f"ai-scene-{i:02d}{ext}"
+        path.write_bytes(raw); outputs.append(str(path))
     return outputs
+
+
+async def generate_scene_backgrounds(match_name: str, scenes: list[dict], output_dir: Path) -> list[str]:
+    if settings.colab_image_worker_url:
+        return await _colab_images(match_name,scenes,output_dir)
+    raise RuntimeError("No free image worker connected. Start the Preet Sports Colab notebook and configure COLAB_IMAGE_WORKER_URL and COLAB_WORKER_TOKEN in Render.")
