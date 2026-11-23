@@ -93,8 +93,8 @@ private fun PreetApp() {
                             status = when {
                                 matchUrl.isBlank() -> "Paste a match URL first."
                                 !matchUrl.startsWith("https://") && !matchUrl.startsWith("http://") -> "Please enter a valid http(s) match URL."
-                                screenshotCount == 0 -> "Match URL entered. Attach CREX page screenshots too if the page cannot be read automatically."
-                                else -> "Match URL and $screenshotCount screenshots selected. Connect the research and image-rendering API to generate graphics."
+                                matchScreenshots.isEmpty() -> "Match URL entered. Attach CREX page screenshots too if the page cannot be read automatically."
+                                else -> "Match URL and ${matchScreenshots.size} screenshots selected. Connect the research and image-rendering API to generate graphics."
                             }
                         }
                     )
