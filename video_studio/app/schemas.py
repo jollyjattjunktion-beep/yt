@@ -7,7 +7,7 @@ class MatchRequest(BaseModel):
     duration_minutes: int = Field(default=10, ge=8, le=12)
     language: str = "Roman Hinglish"
     voice: str | None = "edge:hi-IN-MadhurNeural"
-    tts_provider: str = "edge"
+    tts_provider: str = "both"
     match_facts: dict[str, Any] = Field(default_factory=dict)
     source_url: str | None = None
     screenshot_paths: list[str] = Field(default_factory=list)
