@@ -8,6 +8,7 @@ on:
       - "feature/offline-cricket-ai"
     paths:
       - "video_studio/mobile/**"
+      - ".github/workflows/preet-sports-android-build.yml"
 
 permissions:
   contents: read
@@ -30,9 +31,18 @@ jobs:
         with:
           gradle-version: "8.9"
 
+      - name: Verify Android project checkout
+        run: |
+          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
+          pwd
+          ls -la
+          echo "Checking Android project files"
+          ls -la "$GITHUB_WORKSPACE/video_studio/mobile"
+          test -f "$GITHUB_WORKSPACE/video_studio/mobile/settings.gradle.kts"
+          test -f "$GITHUB_WORKSPACE/video_studio/mobile/build.gradle.kts"
+
       - name: Build debug APK
-        working-directory: video_studio/mobile
-        run: gradle :app:assembleDebug
+        run: gradle -p "$GITHUB_WORKSPACE/video_studio/mobile" :app:assembleDebug --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
