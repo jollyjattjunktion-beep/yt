@@ -66,11 +66,14 @@ class MatchResearchEngine(private val importer: MatchUrlImporter = MatchUrlImpor
             val found = raw.pages.mapNotNull { page ->
                 pattern.find(page.extractedText)?.let { match ->
                     val rawValue = match.groupValues.getOrNull(1).orEmpty()
-                    val stop = Regex("(?i)\\b(FEATURED VIDEOS?|VIDEOS?|RANKINGS?|MORE MATCHES|LIVE:)\\b").find(rawValue)
+                    val stop = Regex("(?i)\\b(FEATURED VIDEOS?|VIDEOS?|RANKINGS?|MORE MATCHES|LIVE:|MATCHES PLAYED|SA VS ALL TEAMS|BAN VS ALL TEAMS|DATE|START TIME|TOSS|UMPIRES|SERIES)\\b").find(rawValue)
                     val value = (if (stop != null) rawValue.substring(0, stop.range.first) else rawValue)
-                        .trim(' ', '|', '•', '-', ':')
-                        .take(120)
-                    if (value.length < 3 || noise.containsMatchIn(value)) null
+                        .trim(' ', '|', '•', '-', ':', ',')
+                        .take(100)
+                    val invalidVenue = field.equals("Venue", true) &&
+                        (Regex("(?i)\\b(vs all teams|matches played|win|loss|avg score|highest score|lowest score)\\b").containsMatchIn(value) ||
+                         value.length > 80 || value.count { it.isDigit() } > 8)
+                    if (value.length < 3 || noise.containsMatchIn(value) || invalidVenue) null
                     else Triple(page, value, match.value.take(180))
                 }
             }
@@ -82,15 +85,16 @@ class MatchResearchEngine(private val importer: MatchUrlImporter = MatchUrlImpor
                 facts += EvidenceFact(field, value, page.url, evidence, if (same) "HIGH" else "MEDIUM")
             }
         }
-        collect("Venue", Regex("(?i)\\bVenue\\s*:?\\s*([^•|]{3,120})"))
+        collect("Venue", Regex("(?i)\\bVenue\\s*:?\\s*([^•|.!?]{3,100})"))
         collect("Match date/time", Regex("(?i)(?:Date\\s*&\\s*Time|Start\\s*Time|Match\\s*Date)\\s*:?\\s*([^•|]{3,140})"))
 
+        if (facts.none { it.field == "Venue" }) missing += "Venue: no clean ground name was extracted; the page contained unrelated venue statistics or no venue field."
         val titleFacts = raw.pages.map { it to it.title }.filter { it.second.isNotBlank() }
         if (titleFacts.isNotEmpty()) {
             val titles = titleFacts.map { it.second }.distinct()
             if (titles.size > 1 && titles.none { it.equals(titles.first(), true) }) {
                 // Different page titles are expected for Info/Squads; only source match pages are compared.
-                val primary = titleFacts.filter { it.first.source == "ICC" || it.first.source == "Cricbuzz" }
+                val primary = titleFacts.filter { it.first.source == "ICC" || it.first.source == "Cricbuzz" || it.first.source == "CREX" }
                 if (primary.map { it.second.lowercase() }.distinct().size > 1) conflicts += "ICC and Cricbuzz page titles differ; confirm they refer to the same fixture."
             }
         }
