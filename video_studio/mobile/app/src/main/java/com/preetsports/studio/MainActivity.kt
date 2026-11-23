@@ -310,7 +310,7 @@ private fun StudioHome(
                                     "Namaskar dosto, swagat hai Preet Sports mein. Aaj ke match ka pre-match analysis shuru karte hain.",
                                     preview
                                 ) { progress -> notice = progress }
-                                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                                     voicePreviewPlayer?.run {
                                         setOnCompletionListener(null)
                                         setOnErrorListener(null)
