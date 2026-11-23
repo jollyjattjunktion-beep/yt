@@ -5,8 +5,6 @@ import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.speech.tts.Voice
-import com.arthenica.ffmpegkit.FFmpegKit
-import com.arthenica.ffmpegkit.ReturnCode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -46,23 +44,10 @@ class AndroidHinglishTts(private val context: Context) {
                 files += segment
             }
             onProgress("Combining ${files.size} voice segments into the final WAV…")
-            if (files.size == 1) {
-                // A short voice preview is normally one segment. Copy the WAV directly:
-                // avoid starting FFmpeg/native codecs just to preview a single sentence.
-                withContext(Dispatchers.IO) { files.single().copyTo(outputWav, overwrite = true) }
-            } else {
-                val manifest = File(workDir, "segments.txt")
-                manifest.writeText(files.joinToString("\n") { "file '${it.absolutePath.replace("'", "'\\''")}'" } + "\n")
-                val command = listOf(
-                    "-y", "-hide_banner", "-loglevel", "error", "-f", "concat", "-safe", "0",
-                    "-i", quote(manifest.absolutePath), "-vn", "-ac", "1", "-ar", "24000",
-                    "-c:a", "pcm_s16le", quote(outputWav.absolutePath)
-                ).joinToString(" ")
-                val session = withContext(Dispatchers.IO) { FFmpegKit.execute(command) }
-                require(ReturnCode.isSuccess(session.returnCode)) {
-                    "Could not assemble Android TTS audio: ${session.allLogsAsString.takeLast(700)}"
-                }
-            }
+            // Join the PCM WAV payloads in Kotlin. Do not launch FFmpeg/native code
+            // between TTS and video rendering: some Android devices terminate here
+            // after the final synthesized segment because of native codec pressure.
+            withContext(Dispatchers.IO) { concatenatePcmWav(files, outputWav) }
             require(outputWav.isFile && outputWav.length() > 44L) {
                 "Android TTS output WAV is missing or empty."
             }
@@ -70,6 +55,103 @@ class AndroidHinglishTts(private val context: Context) {
             return outputWav
         } finally {
             withContext(Dispatchers.Main) { engine.shutdown() }
+        }
+    }
+
+    private data class WavPart(
+        val sampleRate: Int, val channels: Int, val bitsPerSample: Int,
+        val dataOffset: Long, val dataLength: Long
+    )
+
+    private fun concatenatePcmWav(files: List<File>, output: File) {
+        require(files.isNotEmpty()) { "No synthesized voice segments are available." }
+        val parts = files.map { readWavPart(it) }
+        val first = parts.first()
+        require(parts.all {
+            it.sampleRate == first.sampleRate &&
+                it.channels == first.channels &&
+                it.bitsPerSample == first.bitsPerSample
+        }) { "Android TTS changed audio format between segments; regenerate the voiceover." }
+        require(first.bitsPerSample == 16) { "Android TTS must produce 16-bit PCM audio." }
+        val totalData = parts.sumOf { it.dataLength }
+        require(totalData <= 0xFFFFFFFFL - 36L) { "Voiceover is too large for a standard WAV file." }
+        output.parentFile?.mkdirs()
+        output.outputStream().buffered().use { raw ->
+            val header = java.nio.ByteBuffer.allocate(44).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            header.put("RIFF".toByteArray(Charsets.US_ASCII))
+            header.putInt((36L + totalData).toInt())
+            header.put("WAVE".toByteArray(Charsets.US_ASCII))
+            header.put("fmt ".toByteArray(Charsets.US_ASCII))
+            header.putInt(16)
+            header.putShort(1)
+            header.putShort(first.channels.toShort())
+            header.putInt(first.sampleRate)
+            val byteRate = first.sampleRate * first.channels * first.bitsPerSample / 8
+            header.putInt(byteRate)
+            header.putShort((first.channels * first.bitsPerSample / 8).toShort())
+            header.putShort(first.bitsPerSample.toShort())
+            header.put("data".toByteArray(Charsets.US_ASCII))
+            header.putInt(totalData.toInt())
+            raw.write(header.array())
+            val buffer = ByteArray(64 * 1024)
+            files.zip(parts).forEach { (file, part) ->
+                java.io.RandomAccessFile(file, "r").use { input ->
+                    input.seek(part.dataOffset)
+                    var remaining = part.dataLength
+                    while (remaining > 0) {
+                        val count = input.read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
+                        require(count > 0) { "A synthesized TTS segment ended unexpectedly." }
+                        raw.write(buffer, 0, count)
+                        remaining -= count
+                    }
+                }
+            }
+        }
+    }
+
+    private fun readWavPart(file: File): WavPart {
+        java.io.RandomAccessFile(file, "r").use { input ->
+            require(input.length() >= 44) { "TTS segment is not a valid WAV file: ${file.name}" }
+            fun readAscii(count: Int): String {
+                val bytes = ByteArray(count); input.readFully(bytes); return String(bytes, Charsets.US_ASCII)
+            }
+            require(readAscii(4) == "RIFF") { "TTS segment has no RIFF header: ${file.name}" }
+            input.skipBytes(4)
+            require(readAscii(4) == "WAVE") { "TTS segment has no WAVE header: ${file.name}" }
+            var sampleRate = 0
+            var channels = 0
+            var bits = 0
+            var dataOffset = -1L
+            var dataLength = 0L
+            while (input.filePointer + 8 <= input.length()) {
+                val id = readAscii(4)
+                val size = java.nio.ByteBuffer.wrap(ByteArray(4).also(input::readFully))
+                    .order(java.nio.ByteOrder.LITTLE_ENDIAN).int.toLong() and 0xFFFFFFFFL
+                val start = input.filePointer
+                when (id) {
+                    "fmt " -> {
+                        require(size >= 16 && size <= 4096) { "Unsupported WAV format chunk." }
+                        val fmt = ByteArray(size.toInt()); input.readFully(fmt)
+                        val b = java.nio.ByteBuffer.wrap(fmt).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+                        require((b.short.toInt() and 0xFFFF) == 1) { "TTS segment is not uncompressed PCM." }
+                        channels = b.short.toInt() and 0xFFFF
+                        sampleRate = b.int
+                        b.int
+                        b.short
+                        bits = b.short.toInt() and 0xFFFF
+                    }
+                    "data" -> {
+                        dataOffset = start
+                        dataLength = minOf(size, input.length() - start)
+                        break
+                    }
+                    else -> input.seek(start + size + (size and 1L))
+                }
+            }
+            require(sampleRate > 0 && channels in 1..2 && bits == 16 && dataOffset >= 0 && dataLength > 0) {
+                "TTS segment WAV format/data is incomplete: ${file.name}"
+            }
+            return WavPart(sampleRate, channels, bits, dataOffset, dataLength)
         }
     }
 
