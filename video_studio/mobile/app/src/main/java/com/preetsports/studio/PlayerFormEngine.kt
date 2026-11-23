@@ -112,7 +112,7 @@ object PlayerFormParser {
     fun extractSquads(page: MatchSourcePage): List<MatchSquad> {
         val text = page.extractedText
         val result = mutableListOf<MatchSquad>()
-        val pattern = Regex("(?is)([A-Za-z][A-Za-z .'-]{1,35})\\s+Squad\\s*:\\s*(.*?)(?=\\s+[A-Za-z][A-Za-z .'-]{1,35}\\s+Squad\\s*:|\\s+Bench\\s*:|\\s+Support Staff|$)")
+        val pattern = Regex("(?is)([A-Za-z][A-Za-z .'-]{1,35})\\s+squad\\s*(?:players\\s*)?:?\\s*(.*?)(?=\\s+[A-Za-z][A-Za-z .'-]{1,35}\\s+squad\\b|\\s+Bench\\s*:|\\s+Support Staff|$)")
         pattern.findAll(text).forEach { m ->
             val team = m.groupValues[1].trim()
             val names = m.groupValues[2].split(Regex(",|;")).map { cleanPlayerName(it) }
