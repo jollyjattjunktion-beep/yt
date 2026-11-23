@@ -230,9 +230,11 @@ private fun StudioHome(
                         Text(squad.team + ": " + squad.players.joinToString(", "), color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
                     }
                     playerFormPreview.take(12).forEach { form ->
-                        Text(form.player + " · " + form.matches + " matches · " + form.runs + " runs · " + form.wickets + " wkts · SR " + (form.strikeRate?.let { "%.1f".format(it) } ?: "—") + " · Econ " + (form.bowlingEconomy?.let { "%.2f".format(it) } ?: "—"),
+                        val fantasyForm = FantasyFormEngine.evaluate(form)
+                        Text(form.player + " · " + form.matches + " matches · " + form.runs + " runs · " + form.wickets + " wkts · SR " + (form.strikeRate?.let { "%.1f".format(it) } ?: "—") + " · Econ " + (form.bowlingEconomy?.let { "%.2f".format(it) } ?: "—") + " · Form index " + "%.1f".format(fantasyForm.averageFantasyFormPoints),
                             color = Color.White, style = MaterialTheme.typography.bodySmall)
                     }
+                    Text("Fantasy form index is an internal comparison metric, not official Dream11 points. It uses parsed scorecard fields only; unparsed catches, dismissals and bonus rules are not guessed.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
                     Text("Player image candidates are not assigned to players until identity is verified. Source URLs are retained.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
                     Text("Player portrait matching", color = Gold, fontWeight = FontWeight.Bold)
                     OutlinedButton(enabled = !busy && playerNames.isNotBlank(), onClick = {
