@@ -109,22 +109,21 @@ private fun PreetApp() {
                         onPickScreenshots = { screenshotPicker.launch(arrayOf("image/*")) },
                         status = status,
                         onPrepare = {
-                            if (isPreparing) { status = "Production is already running." }
+                            if (isPreparing) { status = "Already processing." }
                             else if (matchUrl.isBlank()) { status = "Paste a match URL first." }
                             else {
                                 scope.launch {
                                     isPreparing = true
                                     try {
-                                        status = "Uploading match URL and screenshots…"
-                                        val jobId = PreetMobileApi.submit(context, matchUrl, matchScreenshots)
-                                        status = "Upload complete. Researching match facts. Job: " + jobId
-                                        PreetMobileApi.waitForJob(jobId) { update -> status = update }
-                                        val downloadId = PreetMobileApi.downloadLandscape(context, jobId)
-                                        status = "Production complete. 1080p MP4 download queued (ID " + downloadId + "). Check Movies/PreetSports."
-                                        Toast.makeText(context, "Preet Sports MP4 download started", Toast.LENGTH_LONG).show()
-                                    } catch (error: Exception) {
-                                        status = "Production error: " + (error.message ?: "Unknown error")
-                                    } finally { isPreparing = false }
+                                        status = "Uploading URL and screenshots…"
+                                        val id = PreetMobileApi.submit(context, matchUrl, matchScreenshots)
+                                        status = "Uploaded. Processing job " + id
+                                        PreetMobileApi.waitForJob(id) { status = it }
+                                        val download = PreetMobileApi.downloadLandscape(context, id)
+                                        status = "Complete. MP4 download queued: " + download
+                                        Toast.makeText(context, "MP4 download started", Toast.LENGTH_LONG).show()
+                                    } catch (e: Exception) { status = "Error: " + (e.message ?: "Unknown") }
+                                    finally { isPreparing = false }
                                 }
                             }
                         }
