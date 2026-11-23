@@ -98,7 +98,8 @@ class MatchUrlImporter {
         require(uri.scheme == "https" && (host == "icc-cricket.com" || host.endsWith(".icc-cricket.com") ||
             host == "cricbuzz.com" || host.endsWith(".cricbuzz.com") ||
             host == "espncricinfo.com" || host.endsWith(".espncricinfo.com") ||
-            host == "howstat.com" || host.endsWith(".howstat.com"))) {
+            host == "howstat.com" || host.endsWith(".howstat.com") ||
+            host == "crex.com" || host.endsWith(".crex.com"))) {
             "Only approved trusted HTTPS cricket-source domains are accepted."
         }
         val request = Request.Builder().url(uri.toASCIIString())
