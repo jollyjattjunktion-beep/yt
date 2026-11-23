@@ -79,7 +79,7 @@ class MatchResearchEngine(private val importer: MatchUrlImporter = MatchUrlImpor
             }
             if (found.isEmpty()) { missing += field; return }
             val distinct = found.map { it.second.lowercase() }.distinct()
-            if (distinct.size > 1) conflicts += "$field differs between supplied pages: " + found.joinToString(" / ") { "\${it.first.source}: \${it.second}" }
+            if (distinct.size > 1) conflicts += "$field differs between supplied pages: " + found.joinToString(" / ") { "${it.first.source}: ${it.second}" }
             found.forEach { (page, value, evidence) ->
                 val same = distinct.size == 1 && found.size >= 2
                 facts += EvidenceFact(field, value, page.url, evidence, if (same) "HIGH" else "MEDIUM")
@@ -102,17 +102,20 @@ class MatchResearchEngine(private val importer: MatchUrlImporter = MatchUrlImpor
             val ground = Regex("(?i)\\b([A-Za-z][A-Za-z .'-]{2,45}\\b(?:Oval|Stadium|Ground|Park|Cricket Ground),\\s*[A-Za-z .'-]+,\\s*[A-Za-z .'-]+)\\b").find(crexText)?.groupValues?.getOrNull(1)?.trim()
             if (ground != null) addCrexFact("Venue", ground)
             val h2h = Regex("(?is)(?:AUS\\s+vs\\s+ENG|ENG\\s+vs\\s+AUS)\\s+Head to Head\\s+\\(Last 10 matches\\).*?\\b(\\d{1,2})\\s*-\\s*(\\d{1,2})\\b").find(crexText)
-            if (h2h != null) addCrexFact("Head-to-head (last 10)", "AUS \${h2h.groupValues[1]} wins – ENG \${h2h.groupValues[2]} wins", h2h.value)
+            if (h2h != null) addCrexFact("Head-to-head (last 10)", "AUS ${h2h.groupValues[1]} wins – ENG ${h2h.groupValues[2]} wins", h2h.value)
             val venueStats = Regex("(?is)Venue Stats.{0,260}?Avg 1st Inns\\s+(\\d+).{0,50}?Avg 2nd Inns\\s+(\\d+)").find(crexText)
-            if (venueStats != null) addCrexFact("Venue scoring averages", "1st innings \${venueStats.groupValues[1]}, 2nd innings \${venueStats.groupValues[2]}", venueStats.value)
+            if (venueStats != null) addCrexFact("Venue scoring averages", "1st innings ${venueStats.groupValues[1]}, 2nd innings ${venueStats.groupValues[2]}", venueStats.value)
             val paceSpin = Regex("(?is)Pace vs Spin.{0,180}?Pace\\s+(\\d+)\\s+Wkt\\s+(\\d+)%\\s+(\\d+)%\\s+Spin\\s+(\\d+)\\s+Wkt").find(crexText)
-            if (paceSpin != null) addCrexFact("Venue pace vs spin wickets", "Pace \${paceSpin.groupValues[1]} wickets (\${paceSpin.groupValues[2]}%); spin \${paceSpin.groupValues[4]} wickets (\${paceSpin.groupValues[3]}%)", paceSpin.value)
+            if (paceSpin != null) addCrexFact("Venue pace vs spin wickets", "Pace ${paceSpin.groupValues[1]} wickets (${paceSpin.groupValues[2]}%); spin ${paceSpin.groupValues[4]} wickets (${paceSpin.groupValues[3]}%)", paceSpin.value)
             val weather = Regex("(?i)Weather in [^.]{0,220}(?:chance|rain)[^.]{0,80}").find(crexText)?.value
             if (weather != null) addCrexFact("Match weather", weather)
             val formSection = Regex("(?is)(?:AUS & ENG|AUS vs ENG) Team Form.{0,360}?(?:Head to Head|Team Comparison)").find(crexText)?.value
             if (formSection != null) addCrexFact("Recent team form (CREX last five)", formSection, formSection)
         }
 
+        // Clear generic-parser warnings when CREX adjacent-block parsing found the field.
+        if (facts.any { it.field == "Venue" }) missing.removeAll { it == "Venue" || it.startsWith("Venue: no clean ground name") }
+        if (facts.any { it.field == "Match date/time" }) missing.removeAll { it == "Match date/time" }
         if (facts.none { it.field == "Venue" }) missing += "Venue: no clean ground name was extracted; the page contained unrelated venue statistics or no venue field."
         val titleFacts = raw.pages.map { it to it.title }.filter { it.second.isNotBlank() }
         if (titleFacts.isNotEmpty()) {
