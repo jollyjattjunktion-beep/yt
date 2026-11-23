@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - "feature/automated-video-studio"
+      - "feature/offline-cricket-ai"
     paths:
       - "video_studio/mobile/**"
 
