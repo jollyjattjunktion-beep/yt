@@ -61,8 +61,10 @@ class MatchUrlImporter {
             catch (e: Exception) { warnings += "ICC source could not be read: ${e.message}" }
         }
         if (cricbuzzUrl.isNotBlank()) {
-            try { pages += fetch(cricbuzzUrl, "Cricbuzz") }
-            catch (e: Exception) { warnings += "Cricbuzz source could not be read: ${e.message}" }
+            val host = runCatching { URI(cricbuzzUrl.trim()).host.orEmpty().lowercase() }.getOrDefault("")
+            val sourceName = if (host == "crex.com" || host.endsWith(".crex.com")) "CREX" else "Cricbuzz"
+            try { pages += fetch(cricbuzzUrl, sourceName) }
+            catch (e: Exception) { warnings += "$sourceName source could not be read: ${e.message}" }
         }
         require(pages.isNotEmpty()) { "Neither match URL could be imported. Check the links or try again later." }
 
@@ -71,7 +73,7 @@ class MatchUrlImporter {
             .find(allText)?.groupValues?.getOrNull(1)?.trim()
         val date = Regex("Date & Time:\\s*([^•]+)", RegexOption.IGNORE_CASE)
             .find(allText)?.groupValues?.getOrNull(1)?.trim()
-        val cricbuzz = pages.firstOrNull { it.source == "Cricbuzz" }
+        val cricbuzz = pages.firstOrNull { it.source == "Cricbuzz" || it.source == "CREX" }
         val squad = cricbuzz?.relatedLinks?.entries?.firstOrNull { it.key.contains("squad", true) }?.value
         val scorecard = cricbuzz?.relatedLinks?.entries?.firstOrNull { it.key.contains("scorecard", true) }?.value
         val info = cricbuzz?.relatedLinks?.entries?.firstOrNull { it.key.equals("Info", true) }?.value
@@ -115,14 +117,18 @@ class MatchUrlImporter {
                 ?.takeIf { it.isNotBlank() } ?: doc.title()
             val description = doc.selectFirst("meta[name=description]")?.attr("content")
                 ?: doc.selectFirst("meta[property=og:description]")?.attr("content").orEmpty()
-            // Prefer the page's main content. Broad body text includes global menus,
-            // trending headlines and video recommendations which are not match facts.
+            // Capture structured metadata before removing scripts. Some cricket pages
+            // expose fixture facts in JSON-LD even when the visible page is JS-rendered.
+            val jsonLd = doc.select("script[type=application/ld+json]").joinToString(" ") { it.data().ifBlank { it.html() } }
+            val metaFacts = doc.select("meta[property^=og:], meta[name^=twitter:], meta[itemprop]")
+                .joinToString(" ") { "${it.attr("property")} ${it.attr("name")} ${it.attr("itemprop")} ${it.attr("content")}" }
+            // Prefer the page's main content; keep structured metadata as separate evidence.
             doc.select("script, style, nav, footer, header, noscript, aside, form, [role=navigation], [aria-label*=menu i], .navbar, .navigation, .trending, .recommendations, .video-recommendations, .ad, .advertisement").remove()
             val main = doc.selectFirst("main, article, [role=main]") ?: doc.body()
-            val text = main?.text().orEmpty()
-                .replace(Regex("\\s+"), " ").trim()
-                .takeIf { it.length >= 120 }
-                ?: doc.body()?.text().orEmpty().replace(Regex("\\s+"), " ").trim()
+            val visibleText = main?.text().orEmpty().replace(Regex("\\s+"), " ").trim()
+                .ifBlank { doc.body()?.text().orEmpty().replace(Regex("\\s+"), " ").trim() }
+            val text = listOf(visibleText, metaFacts, jsonLd).filter { it.isNotBlank() }
+                .joinToString(" ").replace(Regex("\\s+"), " ").trim()
             val links = linkedMapOf<String, String>()
             doc.select("a[href]").forEach { a ->
                 val label = a.text().trim()
