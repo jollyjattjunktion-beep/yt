@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     vexyl_tts_language: str = "hi-IN"
     vexyl_tts_style: str = "formal"
     indicvoice_enabled: bool = True
-    tts_provider: str = "edge"
+    tts_provider: str = "both"
     edge_tts_voice: str = "hi-IN-MadhurNeural"
     cricket_data_api_url: str = ""
     cricket_data_api_key: str = ""
