@@ -70,6 +70,10 @@ private fun StudioHome(
     var pitchSourceUrl by remember { mutableStateOf("") }
     var h2hSourceUrl by remember { mutableStateOf("") }
     var playerNames by remember { mutableStateOf("") }
+    var historicalScorecardUrls by remember { mutableStateOf("") }
+    var importedSquads by remember { mutableStateOf<List<MatchSquad>>(emptyList()) }
+    var playerFormStatus by remember { mutableStateOf("") }
+    var playerFormPreview by remember { mutableStateOf<List<PlayerFormSummary>>(emptyList()) }
     var scriptText by remember { mutableStateOf("") }
     var portraitStatus by remember { mutableStateOf("") }
     var youtubeAccessToken by remember { mutableStateOf("") }
@@ -176,6 +180,59 @@ private fun StudioHome(
                     }
                     report.conflicts.forEach { Text("CONFLICT: $it", color = Gold, style = MaterialTheme.typography.bodySmall) }
                     report.missing.forEach { Text("NOT VERIFIED: $it", color = Color.LightGray, style = MaterialTheme.typography.bodySmall) }
+                    Text("Squads and last-five player database", color = Gold, fontWeight = FontWeight.Bold)
+                    Text("The app reads linked squad pages. For last-five form, paste up to five completed-match scorecard URLs, one per line. Records are stored locally on this phone.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+                    OutlinedTextField(value = historicalScorecardUrls, onValueChange = { historicalScorecardUrls = it },
+                        label = { Text("Last-five completed scorecard URLs (one per line)") },
+                        modifier = Modifier.fillMaxWidth(), minLines = 3, maxLines = 6)
+                    OutlinedButton(enabled = !busy, onClick = {
+                        busy = true
+                        playerFormStatus = "Reading linked squads and scorecards…"
+                        scope.launch {
+                            try {
+                                val importer = MatchUrlImporter()
+                                val base = importedResearch ?: importer.import(iccUrl, cricbuzzUrl)
+                                val squads = base.pages.flatMap { PlayerFormParser.extractSquads(it) }
+                                importedSquads = squads
+                                val historyUrls = historicalScorecardUrls.lines().map { it.trim() }
+                                    .filter { it.isNotBlank() }.distinct().take(5)
+                                val records = mutableListOf<PlayerMatchRecord>()
+                                base.pages.filter { it.source.contains("Scorecard", true) }.forEachIndexed { index, page ->
+                                    records += PlayerFormParser.extractScorecard(page, "current-" + index, report.matchTitle)
+                                }
+                                historyUrls.forEachIndexed { index, url ->
+                                    val page = importer.fetchTrustedSupplementary(url, "Historical scorecard")
+                                    val matchId = Regex("/(\\d{4,})").find(url)?.groupValues?.getOrNull(1) ?: "history-" + index
+                                    val label = page.title.ifBlank { "Historical match " + (index + 1) }
+                                    records += PlayerFormParser.extractScorecard(page, matchId, label)
+                                }
+                                val store = PlayerFormStore(context)
+                                store.upsert(records)
+                                val names = squads.flatMap { it.players }.distinct()
+                                playerFormPreview = names.mapNotNull { store.lastFive(it) }
+                                val project = if (researchProjectPath.isNotBlank()) java.io.File(researchProjectPath)
+                                    else LocalProjectStore(context).createProject(report.matchTitle)
+                                java.io.File(project, "squads.json").writeText(
+                                    org.json.JSONArray().apply { squads.forEach { s ->
+                                        put(org.json.JSONObject().put("team", s.team).put("players", org.json.JSONArray(s.players)).put("source", s.sourceUrl))
+                                    }}.toString(2))
+                                playerFormStatus = "Squads: " + squads.sumOf { it.players.size } + " names from " + squads.size + " team sections. Parsed scorecard records: " + records.size + ". Stored locally. Historical URLs supplied: " + historyUrls.size + "/5."
+                                if (records.isEmpty()) playerFormStatus += " No scorecard rows were parsed; check that the URL is a completed scorecard page."
+                                notice = playerFormStatus
+                            } catch (e: Exception) {
+                                playerFormStatus = "Squad/form import failed: " + e.message
+                                notice = playerFormStatus
+                            } finally { busy = false }
+                        }
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Import squads + update last-five database") }
+                    if (playerFormStatus.isNotBlank()) Text(playerFormStatus, color = Gold, style = MaterialTheme.typography.bodySmall)
+                    importedSquads.forEach { squad ->
+                        Text(squad.team + ": " + squad.players.joinToString(", "), color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+                    }
+                    playerFormPreview.take(12).forEach { form ->
+                        Text(form.player + " · " + form.matches + " matches · " + form.runs + " runs · " + form.wickets + " wkts · SR " + (form.strikeRate?.let { "%.1f".format(it) } ?: "—") + " · Econ " + (form.bowlingEconomy?.let { "%.2f".format(it) } ?: "—"),
+                            color = Color.White, style = MaterialTheme.typography.bodySmall)
+                    }
                     Text("Player image candidates are not assigned to players until identity is verified. Source URLs are retained.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
                     Text("Player portrait matching", color = Gold, fontWeight = FontWeight.Bold)
                     OutlinedButton(enabled = !busy && playerNames.isNotBlank(), onClick = {
