@@ -14,7 +14,7 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
-        buildConfigField("String", "API_BASE_URL", "\"https://YOUR_BACKEND_URL\"")
+        buildConfigField("String", "API_BASE_URL", "\"https://yt-25zl.onrender.com\"")
     }
 
     buildFeatures {
