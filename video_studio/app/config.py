@@ -12,6 +12,12 @@ class Settings(BaseSettings):
     gemini_image_model: str = "gemini-nano-banana-2.1"
     gemini_tts_model: str = "gemini-2.5-flash-preview-tts"
     gemini_tts_voice: str = "Charon"
+    tts_fallback_order: str = "vexyl,indicvoice,edge"
+    vexyl_tts_url: str = ""
+    vexyl_tts_api_key: str = ""
+    vexyl_tts_language: str = "hi-IN"
+    vexyl_tts_style: str = "formal"
+    indicvoice_enabled: bool = True
     tts_provider: str = "edge"
     edge_tts_voice: str = "hi-IN-MadhurNeural"
     cricket_data_api_url: str = ""
