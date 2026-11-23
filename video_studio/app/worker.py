@@ -7,6 +7,7 @@ from .scriptwriter import generate_script
 from .renderer import render_video, safe_name
 from .scene_planner import plan_scenes
 from .config import settings, reload_settings
+from .image_generator import generate_scene_backgrounds
 
 async def process(job):
     job_id=job["id"]
@@ -23,8 +24,10 @@ async def process(job):
         update_job(job_id,stage="Planning sports-broadcast scenes with Gemini",progress=32)
         # Scene timing is derived from actual audio duration after TTS; plan uses an estimate.
         scenes=await plan_scenes(req.match_name,script,research,req.duration_minutes*60)
-        update_job(job_id,stage="Generating narration WAV and assembling sports graphics",progress=42)
-        result=await render_video(script,req.match_name,folder,req.voice,research=research,scenes=scenes,tts_provider=req.tts_provider)
+        update_job(job_id,stage="Generating 8–12 original cricket scene images with Gemini",progress=38)
+        scene_images=await generate_scene_backgrounds(req.match_name,scenes,folder/"ai-scenes")
+        update_job(job_id,stage="Generating narration and rendering 1080p sports video",progress=55)
+        result=await render_video(script,req.match_name,folder,req.voice,research=research,scenes=scenes,tts_provider=req.tts_provider,scene_images=scene_images)
         update_job(job_id,status="completed",stage="Production complete · outputs validated",progress=100,result={"research":research,"scenes":scenes,**result})
     except Exception as exc:
         update_job(job_id,status="failed",stage="Production failed",error=str(exc))
