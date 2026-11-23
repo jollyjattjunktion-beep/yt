@@ -137,9 +137,9 @@ private fun StudioHome(
         Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("02 · Stage 1 — Match research", color = Gold, fontWeight = FontWeight.Bold)
-                Text("Paste official ICC and Cricbuzz match links. The app fetches available page details and related squad/scorecard links.", color = Color.LightGray)
+                Text("Paste an official ICC link and a Cricbuzz or CREX match link. CREX pages are supported when their content is publicly accessible; blocked pages will show an error.", color = Color.LightGray)
                 OutlinedTextField(value = iccUrl, onValueChange = { iccUrl = it; importedResearch = null }, label = { Text("ICC match URL") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
-                OutlinedTextField(value = cricbuzzUrl, onValueChange = { cricbuzzUrl = it; importedResearch = null; researchReport = null }, label = { Text("Cricbuzz match URL") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+                OutlinedTextField(value = cricbuzzUrl, onValueChange = { cricbuzzUrl = it; importedResearch = null; researchReport = null }, label = { Text("Cricbuzz / CREX match URL") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
                 OutlinedTextField(value = pitchSourceUrl, onValueChange = { pitchSourceUrl = it; researchReport = null }, label = { Text("Trusted pitch report URL (optional)") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
                 OutlinedTextField(value = h2hSourceUrl, onValueChange = { h2hSourceUrl = it; researchReport = null }, label = { Text("Trusted H2H / historical results URL (optional)") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
                 OutlinedTextField(value = playerNames, onValueChange = { playerNames = it }, label = { Text("Confirmed player names (comma-separated)") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
@@ -147,7 +147,7 @@ private fun StudioHome(
                     enabled = !busy && (iccUrl.isNotBlank() || cricbuzzUrl.isNotBlank()),
                     onClick = {
                         busy = true
-                        notice = "Fetching match details from ICC and Cricbuzz…"
+                        notice = "Fetching match details from ICC and Cricbuzz / CREX…"
                         scope.launch {
                             try {
                                 val research = MatchResearchEngine().research(iccUrl, cricbuzzUrl, pitchSourceUrl, h2hSourceUrl)
