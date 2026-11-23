@@ -96,6 +96,15 @@ private fun StudioHome(
     var photoUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var voicePreviewPlayer by remember { mutableStateOf<android.media.MediaPlayer?>(null) }
+    DisposableEffect(Unit) {
+        onDispose {
+            voicePreviewPlayer?.setOnCompletionListener(null)
+            voicePreviewPlayer?.setOnErrorListener(null)
+            voicePreviewPlayer?.release()
+            voicePreviewPlayer = null
+        }
+    }
     val photoPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(14)
     ) { uris ->
@@ -301,14 +310,33 @@ private fun StudioHome(
                                     "Namaskar dosto, swagat hai Preet Sports mein. Aaj ke match ka pre-match analysis shuru karte hain.",
                                     preview
                                 ) { progress -> notice = progress }
-                                android.media.MediaPlayer().apply {
-                                    setDataSource(preview.absolutePath)
-                                    setOnCompletionListener { it.release() }
-                                    setOnErrorListener { player, _, _ -> player.release(); true }
-                                    prepare()
-                                    start()
+                                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                    voicePreviewPlayer?.run {
+                                        setOnCompletionListener(null)
+                                        setOnErrorListener(null)
+                                        release()
+                                    }
+                                    val player = android.media.MediaPlayer()
+                                    voicePreviewPlayer = player
+                                    player.setOnCompletionListener { finished ->
+                                        finished.release()
+                                        if (voicePreviewPlayer === finished) voicePreviewPlayer = null
+                                        notice = "Voice preview finished."
+                                    }
+                                    player.setOnErrorListener { failed, what, extra ->
+                                        failed.release()
+                                        if (voicePreviewPlayer === failed) voicePreviewPlayer = null
+                                        notice = "Audio playback failed (\$what/\$extra). Please try Preview again."
+                                        true
+                                    }
+                                    player.setDataSource(preview.absolutePath)
+                                    player.setOnPreparedListener { ready ->
+                                        ready.start()
+                                        notice = "Playing Android Hinglish voice preview."
+                                    }
+                                    player.prepareAsync()
                                 }
-                                notice = "Android Hinglish voice preview generated and playing."
+                                notice = "Voice preview generated. Preparing playback…"
                             } catch (e: Exception) {
                                 notice = "Android TTS preview failed: ${e.message ?: "Install an Indian-English voice in Android Text-to-Speech settings."}"
                             } finally { busy = false }
