@@ -88,6 +88,31 @@ class MatchResearchEngine(private val importer: MatchUrlImporter = MatchUrlImpor
         collect("Venue", Regex("(?i)\\bVenue\\s*:?\\s*([^•|.!?]{3,100})"))
         collect("Match date/time", Regex("(?i)(?:Date\\s*&\\s*Time|Start\\s*Time|Match\\s*Date)\\s*:?\\s*([^•|]{3,140})"))
 
+        // CREX places fixture facts in adjacent text blocks, not always labelled fields.
+        val crexPage = raw.pages.firstOrNull { it.source == "CREX" }
+        val crexText = crexPage?.extractedText.orEmpty()
+        fun addCrexFact(field: String, value: String, evidence: String = value) {
+            if (value.isNotBlank() && facts.none { it.field == field && it.value.equals(value, true) }) {
+                facts += EvidenceFact(field, value, crexPage?.url ?: "", evidence.take(220), "MEDIUM")
+            }
+        }
+        if (crexText.isNotBlank()) {
+            val fixtureDate = Regex("(?i)\\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\\s+\\d{1,2}\\s+[A-Za-z]+,?\\s+\\d{1,2}:\\d{2}\\s*(?:AM|PM)\\b").find(crexText)?.value
+            if (fixtureDate != null) addCrexFact("Match date/time", fixtureDate)
+            val ground = Regex("(?i)\\b([A-Za-z][A-Za-z .'-]{2,45}\\b(?:Oval|Stadium|Ground|Park|Cricket Ground),\\s*[A-Za-z .'-]+,\\s*[A-Za-z .'-]+)\\b").find(crexText)?.groupValues?.getOrNull(1)?.trim()
+            if (ground != null) addCrexFact("Venue", ground)
+            val h2h = Regex("(?is)(?:AUS\\s+vs\\s+ENG|ENG\\s+vs\\s+AUS)\\s+Head to Head\\s+\\(Last 10 matches\\).*?\\b(\\d{1,2})\\s*-\\s*(\\d{1,2})\\b").find(crexText)
+            if (h2h != null) addCrexFact("Head-to-head (last 10)", "AUS \${h2h.groupValues[1]} wins – ENG \${h2h.groupValues[2]} wins", h2h.value)
+            val venueStats = Regex("(?is)Venue Stats.{0,260}?Avg 1st Inns\\s+(\\d+).{0,50}?Avg 2nd Inns\\s+(\\d+)").find(crexText)
+            if (venueStats != null) addCrexFact("Venue scoring averages", "1st innings \${venueStats.groupValues[1]}, 2nd innings \${venueStats.groupValues[2]}", venueStats.value)
+            val paceSpin = Regex("(?is)Pace vs Spin.{0,180}?Pace\\s+(\\d+)\\s+Wkt\\s+(\\d+)%\\s+(\\d+)%\\s+Spin\\s+(\\d+)\\s+Wkt").find(crexText)
+            if (paceSpin != null) addCrexFact("Venue pace vs spin wickets", "Pace \${paceSpin.groupValues[1]} wickets (\${paceSpin.groupValues[2]}%); spin \${paceSpin.groupValues[4]} wickets (\${paceSpin.groupValues[3]}%)", paceSpin.value)
+            val weather = Regex("(?i)Weather in [^.]{0,220}(?:chance|rain)[^.]{0,80}").find(crexText)?.value
+            if (weather != null) addCrexFact("Match weather", weather)
+            val formSection = Regex("(?is)(?:AUS & ENG|AUS vs ENG) Team Form.{0,360}?(?:Head to Head|Team Comparison)").find(crexText)?.value
+            if (formSection != null) addCrexFact("Recent team form (CREX last five)", formSection, formSection)
+        }
+
         if (facts.none { it.field == "Venue" }) missing += "Venue: no clean ground name was extracted; the page contained unrelated venue statistics or no venue field."
         val titleFacts = raw.pages.map { it to it.title }.filter { it.second.isNotBlank() }
         if (titleFacts.isNotEmpty()) {
@@ -109,7 +134,8 @@ class MatchResearchEngine(private val importer: MatchUrlImporter = MatchUrlImpor
                 .map { EvidenceFact("Pitch and conditions", it, page.url, it, "MEDIUM") }
         }
         facts += pitchEvidence
-        if (pitchEvidence.isEmpty()) missing += "Pitch report: no venue-specific pitch evidence was extracted; supply an official ground/board or trusted match preview URL."
+        if (pitchEvidence.isEmpty() && facts.none { it.field == "Match weather" }) missing += "Pitch report: no venue-specific pitch evidence was extracted; supply an official ground/board or trusted match preview URL."
+        else if (pitchEvidence.isEmpty()) missing += "Pitch assessment: weather was found, but no actual surface/pitch behaviour report was present."
 
         val h2hPages = raw.pages.filter { it.source == "H2H source" || it.url.contains("head-to-head", true) || it.url.contains("h2h", true) }
         val h2hEvidence = h2hPages.flatMap { page ->
@@ -118,7 +144,7 @@ class MatchResearchEngine(private val importer: MatchUrlImporter = MatchUrlImpor
                 .map { EvidenceFact("Head to head", it, page.url, it, "MEDIUM") }
         }
         facts += h2hEvidence
-        if (h2hEvidence.isEmpty()) missing += "Head-to-head: no historical result evidence was extracted; supply a trusted series/results or stats URL."
+        if (h2hEvidence.isEmpty() && facts.none { it.field.startsWith("Head-to-head") }) missing += "Head-to-head: no historical result evidence was extracted; supply a trusted series/results or stats URL."
         missing += "Player names and portrait identity matching (image URLs are candidates only until matched to official squad names)"
         return MatchResearchReport(raw.matchTitle, facts.distinctBy { "${it.field}|${it.value}|${it.source}" },
             raw.pages.map { it.url }.distinct(), imageMap, conflicts.distinct(), missing.distinct())
