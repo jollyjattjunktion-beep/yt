@@ -1,0 +1,33 @@
+name: Validate Preet Sports backend and Colab worker
+
+on:
+  push:
+    branches:
+      - feature/automated-video-studio
+    paths:
+      - "video_studio/**"
+      - ".github/workflows/preet-backend-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate Python syntax
+        run: python -m compileall -q video_studio/app
+      - name: Validate Colab notebook JSON
+        run: python -c "import json; p='video_studio/colab/PreetSports_Free_Cricket_Image_Worker.ipynb'; n=json.load(open(p, encoding='utf-8')); assert n['nbformat']==4 and len(n['cells'])>=4; print('Colab notebook JSON valid')"
+      - name: Validate provider configuration and source wiring
+        run: |
+          grep -q 'COLAB_IMAGE_WORKER_URL' video_studio/app/config.py
+          grep -q 'COLAB_WORKER_TOKEN' video_studio/app/config.py
+          grep -q 'VEXYL_TTS_URL' video_studio/app/config.py
+          grep -q 'IndicPipeline' video_studio/app/gemini_tts.py
+          grep -q 'tts_provider: str = "both"' video_studio/app/schemas.py
