@@ -71,7 +71,7 @@ fun VoiceClonePromptCard() {
                     ZipInputStream(raw).use { zip ->
                         while (true) {
                             val entry = zip.nextEntry ?: break
-                            val name = entry.name.replace('\\\\', '/')
+                            val name = entry.name.replace('\\', '/')
                             require(!name.startsWith("/") && !name.split('/').contains("..")) {
                                 "Unsafe path in model ZIP."
                             }
