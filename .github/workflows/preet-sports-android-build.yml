@@ -104,6 +104,29 @@ jobs:
             echo "ONNX Runtime C++ API compiled and linked for $ABI."
           done
 
+      - name: Build SentencePiece Android static dependency
+        shell: bash
+        run: |
+          git clone --depth 1 --branch v0.2.1 https://github.com/google/sentencepiece.git /tmp/sentencepiece
+          NDK_ROOT="$(find "$ANDROID_HOME/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          for ABI in arm64-v8a armeabi-v7a; do
+            BUILD="/tmp/sentencepiece-build-$ABI"
+            cmake -S /tmp/sentencepiece -B "$BUILD" \
+              -DCMAKE_TOOLCHAIN_FILE="$NDK_ROOT/build/cmake/android.toolchain.cmake" \
+              -DANDROID_ABI="$ABI" \
+              -DANDROID_PLATFORM=android-29 \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DSPM_ENABLE_SHARED=OFF \
+              -DSPM_ENABLE_TCMALLOC=OFF \
+              -DSPM_PROTOBUF_PROVIDER=internal \
+              -DSPM_ABSL_PROVIDER=internal \
+              -DSPM_ENABLE_NFKC_COMPILE=OFF \
+              -DSPM_BUILD_TEST=OFF
+            cmake --build "$BUILD" --target sentencepiece-static --parallel 2
+            test -s "$BUILD/src/libsentencepiece.a"
+            echo "SentencePiece v0.2.1 static library built for $ABI."
+          done
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
