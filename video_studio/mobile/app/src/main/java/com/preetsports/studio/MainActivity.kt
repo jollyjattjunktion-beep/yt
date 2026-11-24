@@ -117,6 +117,7 @@ private fun StudioHome(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Text("PREET SPORTS", color = Gold, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        VoiceClonePromptCard()
         Text("AI Cricket Production Studio", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Text("Research match facts, cross-check trusted sources, match portraits and create Roman Hinglish videos on your Android device.", color = Color.LightGray)
         Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
