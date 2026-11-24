@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import java.io.File
+import java.security.MessageDigest
 import java.util.zip.ZipInputStream
 
 /** Copies a user-selected WAV into app-private storage; never uploads the recording. */
@@ -66,6 +67,7 @@ fun VoiceClonePromptCard() {
                 staging.deleteRecursively()
                 require(staging.mkdirs() || staging.isDirectory) { "Could not create model staging folder." }
                 var entries = 0
+                var extractedBytes = 0L
                 context.contentResolver.openInputStream(uri).use { raw ->
                     requireNotNull(raw) { "Could not open model ZIP." }
                     ZipInputStream(raw).use { zip ->
@@ -82,7 +84,18 @@ fun VoiceClonePromptCard() {
                                     "Unsafe model file path."
                                 }
                                 target.parentFile?.mkdirs()
-                                target.outputStream().use { output -> zip.copyTo(output) }
+                                target.outputStream().use { output ->
+                                    val buffer = ByteArray(64 * 1024)
+                                    while (true) {
+                                        val count = zip.read(buffer)
+                                        if (count < 0) break
+                                        extractedBytes += count
+                                        require(extractedBytes <= 512L * 1024L * 1024L) {
+                                            "Model ZIP expands beyond the 512 MB safety limit."
+                                        }
+                                        output.write(buffer, 0, count)
+                                    }
+                                }
                                 entries++
                             }
                             zip.closeEntry()
@@ -96,9 +109,40 @@ fun VoiceClonePromptCard() {
                 )
                 val missing = required.filterNot { File(staging, it).isFile }
                 require(missing.isEmpty()) { "Model ZIP is incomplete: " + missing.joinToString() }
+
+                // Verify every file listed by the publisher's SHA-256 manifest before activation.
+                val manifest = File(staging, "SHA256SUMS")
+                require(manifest.isFile) { "Model ZIP has no SHA256SUMS manifest." }
+                val checksums = manifest.readLines().filter { it.isNotBlank() }
+                require(checksums.isNotEmpty()) { "Model checksum manifest is empty." }
+                var verified = 0
+                checksums.forEach { line ->
+                    val parts = line.trim().split(Regex("\\s+"), limit = 2)
+                    require(parts.size == 2 && parts[0].matches(Regex("[a-fA-F0-9]{64}"))) {
+                        "Invalid checksum manifest entry."
+                    }
+                    val relativePath = parts[1].trim().removePrefix("*")
+                    val candidate = File(staging, relativePath)
+                    require(candidate.canonicalPath.startsWith(staging.canonicalPath + File.separator) &&
+                        candidate.isFile) { "Missing or unsafe checksummed file: $relativePath" }
+                    val digest = MessageDigest.getInstance("SHA-256")
+                    candidate.inputStream().buffered().use { input ->
+                        val buffer = ByteArray(64 * 1024)
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            digest.update(buffer, 0, count)
+                        }
+                    }
+                    val actual = digest.digest().joinToString("") { "%02x".format(it) }
+                    require(actual.equals(parts[0], ignoreCase = true)) {
+                        "Checksum failed for $relativePath"
+                    }
+                    verified++
+                }
                 folder.deleteRecursively()
                 require(staging.renameTo(folder)) { "Could not activate imported model pack." }
-                "Hindi model pack imported and verified ($entries files)."
+                "Hindi model pack imported: $entries files, $verified SHA-256 checks passed."
             } catch (e: Exception) {
                 File(context.filesDir, "pockettts-models-staging").deleteRecursively()
                 "Model import failed: " + (e.message ?: "unknown error")
