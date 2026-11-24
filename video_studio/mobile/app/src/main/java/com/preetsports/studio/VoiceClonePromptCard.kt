@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import java.io.File
 import java.io.RandomAccessFile
 import java.security.MessageDigest
+import java.util.HashSet
 import java.util.zip.ZipInputStream
 import org.json.JSONObject
 
@@ -88,6 +89,7 @@ private fun importPocketTtsModel(context: android.content.Context, uri: Uri): St
     try {
         var entries = 0
         var extractedBytes = 0L
+        val extractedPaths = HashSet<String>()
         context.contentResolver.openInputStream(uri).use { raw ->
             requireNotNull(raw) { "Could not open model ZIP." }
             ZipInputStream(raw).use { zip ->
@@ -99,6 +101,10 @@ private fun importPocketTtsModel(context: android.content.Context, uri: Uri): St
                     }
                     val relative = if (name.startsWith("onnx/")) name.removePrefix("onnx/") else name
                     if (relative.isNotBlank() && !entry.isDirectory) {
+                        require(++entries <= 64) { "Model ZIP contains too many files." }
+                        require(extractedPaths.add(relative)) {
+                            "Model ZIP contains a duplicate file path: $relative"
+                        }
                         val target = File(staging, relative)
                         require(target.canonicalPath.startsWith(staging.canonicalPath + File.separator)) {
                             "Unsafe model file path."
@@ -116,7 +122,6 @@ private fun importPocketTtsModel(context: android.content.Context, uri: Uri): St
                                 output.write(buffer, 0, count)
                             }
                         }
-                        entries++
                     }
                     zip.closeEntry()
                 }
