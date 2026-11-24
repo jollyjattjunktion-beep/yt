@@ -13,10 +13,14 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -72,6 +76,115 @@ private fun validatePocketTtsWav(file: File) {
     }
 }
 
+
+/** Extracts and verifies the full model off the UI thread, then swaps it into place safely. */
+private fun importPocketTtsModel(context: android.content.Context, uri: Uri): String {
+    val folder = File(context.filesDir, "pockettts-models")
+    val staging = File(context.filesDir, "pockettts-models-staging")
+    val backup = File(context.filesDir, "pockettts-models-backup")
+    staging.deleteRecursively()
+    require(staging.mkdirs() || staging.isDirectory) { "Could not create model staging folder." }
+    try {
+        var entries = 0
+        var extractedBytes = 0L
+        context.contentResolver.openInputStream(uri).use { raw ->
+            requireNotNull(raw) { "Could not open model ZIP." }
+            ZipInputStream(raw).use { zip ->
+                while (true) {
+                    val entry = zip.nextEntry ?: break
+                    val name = entry.name.replace('\\\\', '/')
+                    require(!name.startsWith("/") && !name.split('/').contains("..")) {
+                        "Unsafe path in model ZIP."
+                    }
+                    val relative = if (name.startsWith("onnx/")) name.removePrefix("onnx/") else name
+                    if (relative.isNotBlank() && !entry.isDirectory) {
+                        val target = File(staging, relative)
+                        require(target.canonicalPath.startsWith(staging.canonicalPath + File.separator)) {
+                            "Unsafe model file path."
+                        }
+                        target.parentFile?.mkdirs()
+                        target.outputStream().use { output ->
+                            val buffer = ByteArray(64 * 1024)
+                            while (true) {
+                                val count = zip.read(buffer)
+                                if (count < 0) break
+                                extractedBytes += count
+                                require(extractedBytes <= 512L * 1024L * 1024L) {
+                                    "Model ZIP expands beyond the 512 MB safety limit."
+                                }
+                                output.write(buffer, 0, count)
+                            }
+                        }
+                        entries++
+                    }
+                    zip.closeEntry()
+                }
+            }
+        }
+        val required = listOf(
+            "mimi_encoder.onnx", "text_conditioner.onnx",
+            "flow_lm_main_int8.onnx", "flow_lm_flow_int8.onnx",
+            "mimi_decoder_int8.onnx", "tokenizer.model", "bos_before_voice.npy"
+        )
+        val missing = required.filterNot { File(staging, it).isFile }
+        require(missing.isEmpty()) { "Model ZIP is incomplete: " + missing.joinToString() }
+
+        val manifest = File(staging, "SHA256SUMS")
+        require(manifest.isFile) { "Model ZIP has no SHA256SUMS manifest." }
+        val checksums = manifest.readLines().filter { it.isNotBlank() }
+        require(checksums.isNotEmpty()) { "Model checksum manifest is empty." }
+        val manifestPaths = checksums.map {
+            it.trim().split(Regex("\\s+"), limit = 2).getOrNull(1)?.trim()?.removePrefix("*")
+        }
+        require(required.all { it in manifestPaths }) {
+            "Checksum manifest does not cover every required model file."
+        }
+        var verified = 0
+        checksums.forEach { line ->
+            val parts = line.trim().split(Regex("\\s+"), limit = 2)
+            require(parts.size == 2 && parts[0].matches(Regex("[a-fA-F0-9]{64}"))) {
+                "Invalid checksum manifest entry."
+            }
+            val relativePath = parts[1].trim().removePrefix("*")
+            val candidate = File(staging, relativePath)
+            require(candidate.canonicalPath.startsWith(staging.canonicalPath + File.separator) &&
+                candidate.isFile) { "Missing or unsafe checksummed file: $relativePath" }
+            val digest = MessageDigest.getInstance("SHA-256")
+            candidate.inputStream().buffered().use { input ->
+                val buffer = ByteArray(64 * 1024)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    digest.update(buffer, 0, count)
+                }
+            }
+            val actual = digest.digest().joinToString("") { "%02x".format(it) }
+            require(actual.equals(parts[0], ignoreCase = true)) {
+                "Checksum failed for $relativePath"
+            }
+            verified++
+        }
+
+        backup.deleteRecursively()
+        val hadPreviousPack = folder.exists()
+        if (hadPreviousPack) {
+            require(folder.renameTo(backup)) { "Could not preserve the existing model pack." }
+        }
+        try {
+            require(staging.renameTo(folder)) { "Could not activate imported model pack." }
+        } catch (e: Exception) {
+            if (hadPreviousPack && backup.exists()) backup.renameTo(folder)
+            throw e
+        }
+        backup.deleteRecursively()
+        return "Hindi model pack imported: $entries files, $verified SHA-256 checks passed."
+    } catch (e: Exception) {
+        staging.deleteRecursively()
+        if (!folder.exists() && backup.exists()) backup.renameTo(folder)
+        throw e
+    }
+}
+
 /** Copies a user-selected WAV into app-private storage; never uploads the recording. */
 @Composable
 fun VoiceClonePromptCard() {
@@ -112,101 +225,22 @@ fun VoiceClonePromptCard() {
         }
     }
 
+    val scope = rememberCoroutineScope()
     val modelPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        modelStatus = if (uri == null) {
-            "Model pack selection cancelled."
+        if (uri == null) {
+            modelStatus = "Model pack selection cancelled."
         } else {
-            try {
-                val folder = File(context.filesDir, "pockettts-models")
-                val staging = File(context.filesDir, "pockettts-models-staging")
-                staging.deleteRecursively()
-                require(staging.mkdirs() || staging.isDirectory) { "Could not create model staging folder." }
-                var entries = 0
-                var extractedBytes = 0L
-                context.contentResolver.openInputStream(uri).use { raw ->
-                    requireNotNull(raw) { "Could not open model ZIP." }
-                    ZipInputStream(raw).use { zip ->
-                        while (true) {
-                            val entry = zip.nextEntry ?: break
-                            val name = entry.name.replace('\\', '/')
-                            require(!name.startsWith("/") && !name.split('/').contains("..")) {
-                                "Unsafe path in model ZIP."
-                            }
-                            val relative = if (name.startsWith("onnx/")) name.removePrefix("onnx/") else name
-                            if (relative.isNotBlank() && !entry.isDirectory) {
-                                val target = File(staging, relative)
-                                require(target.canonicalPath.startsWith(staging.canonicalPath + File.separator)) {
-                                    "Unsafe model file path."
-                                }
-                                target.parentFile?.mkdirs()
-                                target.outputStream().use { output ->
-                                    val buffer = ByteArray(64 * 1024)
-                                    while (true) {
-                                        val count = zip.read(buffer)
-                                        if (count < 0) break
-                                        extractedBytes += count
-                                        require(extractedBytes <= 512L * 1024L * 1024L) {
-                                            "Model ZIP expands beyond the 512 MB safety limit."
-                                        }
-                                        output.write(buffer, 0, count)
-                                    }
-                                }
-                                entries++
-                            }
-                            zip.closeEntry()
-                        }
+            modelStatus = "Importing and verifying model pack…"
+            scope.launch {
+                modelStatus = try {
+                    withContext(Dispatchers.IO) {
+                        importPocketTtsModel(context, uri)
                     }
+                } catch (e: Exception) {
+                    "Model import failed: " + (e.message ?: "unknown error")
                 }
-                val required = listOf(
-                    "mimi_encoder.onnx", "text_conditioner.onnx",
-                    "flow_lm_main_int8.onnx", "flow_lm_flow_int8.onnx",
-                    "mimi_decoder_int8.onnx", "tokenizer.model", "bos_before_voice.npy"
-                )
-                val missing = required.filterNot { File(staging, it).isFile }
-                require(missing.isEmpty()) { "Model ZIP is incomplete: " + missing.joinToString() }
-
-                // Verify every file listed by the publisher's SHA-256 manifest before activation.
-                val manifest = File(staging, "SHA256SUMS")
-                require(manifest.isFile) { "Model ZIP has no SHA256SUMS manifest." }
-                val checksums = manifest.readLines().filter { it.isNotBlank() }
-                require(checksums.isNotEmpty()) { "Model checksum manifest is empty." }
-                val manifestPaths = checksums.map { it.trim().split(Regex("\\s+"), limit = 2).getOrNull(1)?.trim()?.removePrefix("*") }
-                require(required.all { it in manifestPaths }) {
-                    "Checksum manifest does not cover every required model file."
-                }
-                var verified = 0
-                checksums.forEach { line ->
-                    val parts = line.trim().split(Regex("\\s+"), limit = 2)
-                    require(parts.size == 2 && parts[0].matches(Regex("[a-fA-F0-9]{64}"))) {
-                        "Invalid checksum manifest entry."
-                    }
-                    val relativePath = parts[1].trim().removePrefix("*")
-                    val candidate = File(staging, relativePath)
-                    require(candidate.canonicalPath.startsWith(staging.canonicalPath + File.separator) &&
-                        candidate.isFile) { "Missing or unsafe checksummed file: $relativePath" }
-                    val digest = MessageDigest.getInstance("SHA-256")
-                    candidate.inputStream().buffered().use { input ->
-                        val buffer = ByteArray(64 * 1024)
-                        while (true) {
-                            val count = input.read(buffer)
-                            if (count < 0) break
-                            digest.update(buffer, 0, count)
-                        }
-                    }
-                    val actual = digest.digest().joinToString("") { "%02x".format(it) }
-                    require(actual.equals(parts[0], ignoreCase = true)) {
-                        "Checksum failed for $relativePath"
-                    }
-                    verified++
-                }
-                folder.deleteRecursively()
-                require(staging.renameTo(folder)) { "Could not activate imported model pack." }
-                "Hindi model pack imported: $entries files, $verified SHA-256 checks passed."
-            } catch (e: Exception) {
-                File(context.filesDir, "pockettts-models-staging").deleteRecursively()
-                "Model import failed: " + (e.message ?: "unknown error")
             }
         }
     }
