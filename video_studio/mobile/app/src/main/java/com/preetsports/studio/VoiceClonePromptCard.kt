@@ -185,61 +185,79 @@ private fun importPocketTtsModel(context: android.content.Context, uri: Uri): St
     }
 }
 
-/** Copies a user-selected WAV into app-private storage; never uploads the recording. */
+/** Copies and validates a selected WAV on IO; never uploads the recording. */
+private fun importPocketTtsVoicePrompt(context: android.content.Context, uri: Uri): String {
+    val mime = context.contentResolver.getType(uri).orEmpty()
+    require(mime == "audio/wav" || mime == "audio/x-wav" || uri.toString().lowercase().endsWith(".wav")) { "Please select a WAV recording." }
+    val folder = File(context.filesDir, "voice-clone").apply { mkdirs() }
+    val target = File(folder, "preet_voice_prompt.wav")
+    val temporary = File(folder, "preet_voice_prompt.wav.tmp")
+    val backup = File(folder, "preet_voice_prompt.wav.backup")
+    temporary.delete()
+    try {
+        context.contentResolver.openInputStream(uri).use { input ->
+            requireNotNull(input) { "Could not open selected recording." }
+            temporary.outputStream().use { output -> input.copyTo(output) }
+        }
+        validatePocketTtsWav(temporary)
+        backup.delete()
+        val hadPrevious = target.exists()
+        if (hadPrevious) require(target.renameTo(backup)) { "Could not preserve the previous voice prompt." }
+        try {
+            require(temporary.renameTo(target)) { "Could not save validated voice prompt." }
+        } catch (e: Exception) {
+            if (hadPrevious && backup.exists()) backup.renameTo(target)
+            throw e
+        }
+        backup.delete()
+        return "Private voice prompt verified: PCM 16-bit, mono, 24 kHz."
+    } catch (e: Exception) {
+        temporary.delete()
+        if (!target.exists() && backup.exists()) backup.renameTo(target)
+        throw e
+    }
+}
+
+/** Offline voice setup card. */
 @Composable
 fun VoiceClonePromptCard() {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var status by remember { mutableStateOf("No private voice prompt imported yet.") }
     var modelStatus by remember { mutableStateOf("Hindi model pack not imported.") }
-    val picker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        status = if (uri == null) {
-            "Voice prompt selection cancelled."
-        } else {
-            try {
-                val mime = context.contentResolver.getType(uri).orEmpty()
-                require(mime == "audio/wav" || mime == "audio/x-wav" ||
-                    uri.toString().lowercase().endsWith(".wav")) {
-                    "Please select a WAV recording."
-                }
-                val folder = File(context.filesDir, "voice-clone").apply { mkdirs() }
-                val target = File(folder, "preet_voice_prompt.wav")
-                val temporary = File(folder, "preet_voice_prompt.wav.tmp")
-                temporary.delete()
-                context.contentResolver.openInputStream(uri).use { input ->
-                    requireNotNull(input) { "Could not open selected recording." }
-                    temporary.outputStream().use { output -> input.copyTo(output) }
-                }
-                try {
-                    validatePocketTtsWav(temporary)
-                    require(temporary.renameTo(target)) { "Could not save validated voice prompt." }
+    var voiceBusy by remember { mutableStateOf(false) }
+    var modelBusy by remember { mutableStateOf(false) }
+    val picker = rememberLauncherForActivityResult(contract = ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri == null) status = "Voice prompt selection cancelled."
+        else {
+            voiceBusy = true
+            status = "Importing and validating voice recording…"
+            scope.launch {
+                status = try {
+                    withContext(Dispatchers.IO) { importPocketTtsVoicePrompt(context, uri) }
                 } catch (e: Exception) {
-                    temporary.delete()
-                    throw e
+                    "Import failed: " + (e.message ?: "unknown error")
+                } finally {
+                    voiceBusy = false
                 }
-                "Private voice prompt verified: PCM 16-bit, mono, 24 kHz."
-            } catch (e: Exception) {
-                "Import failed: " + (e.message ?: "unknown error")
             }
         }
     }
-
     val scope = rememberCoroutineScope()
     val modelPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        if (uri == null) {
-            modelStatus = "Model pack selection cancelled."
-        } else {
+        if (uri == null) modelStatus = "Model pack selection cancelled."
+        else {
+            modelBusy = true
             modelStatus = "Importing and verifying model pack…"
             scope.launch {
                 modelStatus = try {
-                    withContext(Dispatchers.IO) {
-                        importPocketTtsModel(context, uri)
-                    }
+                    withContext(Dispatchers.IO) { importPocketTtsModel(context, uri) }
                 } catch (e: Exception) {
                     "Model import failed: " + (e.message ?: "unknown error")
+                } finally {
+                    modelBusy = false
                 }
             }
         }
@@ -253,13 +271,13 @@ fun VoiceClonePromptCard() {
             Text("OFFLINE HINDI VOICE", style = MaterialTheme.typography.titleMedium)
             Text("Import your own clean WAV voice prompt. It stays in this app's private storage.")
             Row {
-                Button(onClick = { picker.launch(arrayOf("audio/wav", "audio/x-wav")) }) {
-                    Text("Import my WAV")
+                Button(enabled = !voiceBusy && !modelBusy, onClick = { picker.launch(arrayOf("audio/wav", "audio/x-wav")) }) {
+                    Text(if (voiceBusy) "Importing WAV…" else "Import my WAV")
                 }
             }
             Text(status, style = MaterialTheme.typography.bodySmall)
-            Button(onClick = { modelPicker.launch(arrayOf("application/zip", "application/x-zip-compressed")) }) {
-                Text("Import Hindi model ZIP")
+            Button(enabled = !modelBusy && !voiceBusy, onClick = { modelPicker.launch(arrayOf("application/zip", "application/x-zip-compressed")) }) {
+                Text(if (modelBusy) "Importing model…" else "Import Hindi model ZIP")
             }
             Text(modelStatus, style = MaterialTheme.typography.bodySmall)
             Text(
