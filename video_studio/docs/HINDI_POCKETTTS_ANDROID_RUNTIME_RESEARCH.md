@@ -36,3 +36,44 @@ JNI declarations must match the exact vendored source; mixing these versions wou
 ## Current decision
 
 Do not copy the reference JNI bridge unchanged and do not enable a fake Generate action. First pin a runtime revision and validate it against the Hindi model graphs, then implement the matching JNI bridge and Android CMake build on this experimental branch only.
+
+## Pinned-source API and Android build findings
+
+The Hindi ONNX README identifies the reviewed runtime snapshot as based on
+`VolgaGerm/PocketTTS.cpp@e801e7d6c2692121a39e80ae525cb5265174a495`.
+The pinned upstream source at that revision exposes this seven-argument C
+constructor (the JNI declaration must be checked against the Hindi snapshot
+itself before use):
+
+```cpp
+void* ptt_create(
+    const char* models_dir,
+    const char* voices_dir,
+    const char* tokenizer_path,
+    const char* precision,
+    float temperature,
+    int lsd_steps,
+    int num_threads
+);
+```
+
+The same pinned upstream source exposes streaming calls
+`ptt_stream_start(handle, text, voice)`,
+`ptt_stream_read(stream_ctx, &samples, &sample_count)`, and
+`ptt_stream_end(stream_ctx)`, plus `ptt_destroy(handle)` and
+`ptt_free_audio(samples)`. Ownership and thread-safety must be preserved in
+the JNI wrapper; especially, every returned sample buffer must be freed with
+the matching native API.
+
+The bundled runtime's desktop CMake configuration is not an Android build
+recipe: it selects Linux/macOS/Windows ONNX Runtime archives and builds a CLI
+executable. It uses CMake 3.28+, C++17, SentencePiece, dr_libs and ONNX Runtime
+1.23.2. Android integration therefore needs a separate Android-aware CMake
+target, Android-compatible ONNX Runtime headers/shared library for each
+packaged ABI, and a JNI shared-library target. Do not point Android CMake at
+the desktop Linux ONNX Runtime archive.
+
+The Hindi model README also explicitly requires the Hindi BOS-before-voice
+tensor and warns that older runtimes omitting it can terminate synthesis
+prematurely. This must be verified in the exact Hindi source snapshot, not
+assumed from the upstream base revision.
