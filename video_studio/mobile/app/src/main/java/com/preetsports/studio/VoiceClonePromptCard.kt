@@ -62,7 +62,12 @@ private fun validatePocketTtsWav(file: File) {
                     wav.skipBytes(6)
                     bitsPerSample = java.lang.Short.toUnsignedInt(java.lang.Short.reverseBytes(wav.readShort()))
                 }
-                "data" -> dataBytes = size
+                "data" -> {
+                    require(size > 0L && size % 2L == 0L && start + size <= wav.length()) {
+                        "WAV audio data chunk is incomplete or not aligned to 16-bit samples."
+                    }
+                    dataBytes = size
+                }
             }
             val next = start + size + (size and 1L)
             if (next > wav.length()) break
@@ -71,8 +76,10 @@ private fun validatePocketTtsWav(file: File) {
         require(format == 1 && channels == 1 && sampleRate == 24000 && bitsPerSample == 16) {
             "Use PCM 16-bit, mono, 24 kHz WAV audio."
         }
-        val durationSeconds = (dataBytes ?: 0L) / (24000L * 2L)
-        require(durationSeconds in 5L..30L) {
+        val audioBytes = dataBytes ?: 0L
+        val minimumBytes = 5L * 24000L * 2L
+        val maximumBytes = 30L * 24000L * 2L
+        require(audioBytes in minimumBytes..maximumBytes) {
             "Voice prompt must contain 5–30 seconds of audio."
         }
     }
