@@ -27,7 +27,7 @@ jobs:
       - name: Download official Hindi ONNX model files
         run: |
           hf download saryps-labs/pocket-tts-hindi \
-            --include "onnx/*" "NOTICE.md" "MODEL_LICENSE.md" \
+            --include "onnx/*" \
             --local-dir model-source
 
       - name: Verify required Hindi runtime assets
@@ -44,6 +44,7 @@ jobs:
           test -s model-source/onnx/runtime/CMakeLists.txt
           test -s model-source/onnx/SHA256SUMS
           test -s model-source/onnx/VALIDATION.md
+          test -s model-source/onnx/run_onnx.py
           du -sh model-source/onnx
 
       - name: Create model pack
