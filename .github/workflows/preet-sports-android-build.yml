@@ -53,6 +53,16 @@ jobs:
           unzip -l "$APK" | tee /tmp/apk-contents.txt
           grep -q "lib/arm64-v8a/libpreet_pockettts_jni.so" /tmp/apk-contents.txt
           grep -q "lib/armeabi-v7a/libpreet_pockettts_jni.so" /tmp/apk-contents.txt
+          mkdir -p /tmp/preet-apk-check
+          unzip -q "$APK" 'lib/*/libpreet_pockettts_jni.so' -d /tmp/preet-apk-check
+          LLVM_NM="$(find "$ANDROID_HOME/ndk" -type f -name llvm-nm | sort -V | tail -n 1)"
+          test -x "$LLVM_NM"
+          for ABI in arm64-v8a armeabi-v7a; do
+            LIB="/tmp/preet-apk-check/lib/$ABI/libpreet_pockettts_jni.so"
+            test -s "$LIB"
+            "$LLVM_NM" -D --defined-only "$LIB" | tee "/tmp/$ABI-symbols.txt"
+            grep -q "Java_com_preetsports_studio_NativeBuildSmoke_nativeAbiWordSize" "/tmp/$ABI-symbols.txt"
+          done
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
