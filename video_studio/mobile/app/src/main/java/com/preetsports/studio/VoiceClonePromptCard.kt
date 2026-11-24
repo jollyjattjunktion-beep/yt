@@ -243,7 +243,6 @@ fun VoiceClonePromptCard() {
             }
         }
     }
-    val scope = rememberCoroutineScope()
     val modelPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
