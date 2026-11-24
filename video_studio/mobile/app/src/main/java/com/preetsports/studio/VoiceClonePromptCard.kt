@@ -88,6 +88,7 @@ private fun importPocketTtsModel(context: android.content.Context, uri: Uri): St
     require(staging.mkdirs() || staging.isDirectory) { "Could not create model staging folder." }
     try {
         var entries = 0
+        var archiveEntries = 0
         var extractedBytes = 0L
         val extractedPaths = HashSet<String>()
         context.contentResolver.openInputStream(uri).use { raw ->
