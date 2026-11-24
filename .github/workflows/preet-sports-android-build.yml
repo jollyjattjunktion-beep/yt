@@ -45,6 +45,15 @@ jobs:
       - name: Build debug APK
         run: gradle -p "$GITHUB_WORKSPACE/video_studio/mobile" :app:assembleDebug --stacktrace
 
+      - name: Verify JNI libraries are packaged in the APK
+        shell: bash
+        run: |
+          APK="video_studio/mobile/app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$APK"
+          unzip -l "$APK" | tee /tmp/apk-contents.txt
+          grep -q "lib/arm64-v8a/libpreet_pockettts_jni.so" /tmp/apk-contents.txt
+          grep -q "lib/armeabi-v7a/libpreet_pockettts_jni.so" /tmp/apk-contents.txt
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
