@@ -138,3 +138,44 @@ Then choose one matching managed/native runtime version, pin the native AAR
 hash, and build a small JNI smoke-test target. Hindi BOS conditioning remains
 a separate mandatory gate before speech output can be enabled.
 
+## Hindi release snapshot compatibility correction (2026-11-24)
+
+A review of the current `saryps-labs/pocket-tts-hindi/onnx` release documentation
+and its validation record corrects one earlier conclusion above: the **Hindi
+release's own reviewed runtime snapshot does implement the BOS-before-voice
+behavior**. Its README says the runtime detects `onnx/bos_before_voice.npy`
+and prepends it while encoding a raw audio prompt; the validation record says
+omitting this frame caused premature EOS. The earlier statement that the
+Android community runtime had no BOS support remains true for that separate
+project, but must not be generalized to the Hindi release's own runtime.
+
+The Hindi release records these facts:
+
+- Runtime base: `VolgaGerm/PocketTTS.cpp@e801e7d6c2692121a39e80ae525cb5265174a495`,
+  with Hindi compatibility fixes in the release's `onnx/runtime/` snapshot.
+- The source snapshot is identified in the release commit by
+  `onnx/runtime/pocket_tts.cpp` SHA-256
+  `9c1c2208f68448f61c9cb169432f3af19c1741a35d2eef6984cdbcf448ea85e9`.
+- The validation record reports that all five graphs loaded with ONNX Runtime
+  1.23.2 CPUExecutionProvider and that the native CLI smoke tests used the
+  required `[BOS, Mimi(prompt)]` voice state.
+- The release pins ONNX Runtime 1.23.2. These checks establish Linux CPU
+  compatibility, **not Android ABI compatibility or OPPO-device performance**.
+- The model README recommends plain Devanagari Hindi; Latin/Roman text,
+  numbers, short isolated tokens and punctuation-heavy input are less reliable.
+
+Sources:
+- https://huggingface.co/saryps-labs/pocket-tts-hindi/blob/main/onnx/README.md
+- https://huggingface.co/saryps-labs/pocket-tts-hindi/blob/main/onnx/VALIDATION.md
+- https://huggingface.co/saryps-labs/pocket-tts-hindi/commit/c09efe62d2b17c0848318104d8b88e20b83e32b8
+
+### Revised integration decision
+
+Use the **Hindi release's own pinned runtime snapshot** as the primary porting
+candidate, rather than the unrelated Android community fork. Before writing
+JNI, inspect that exact snapshot's exported C API, build dependencies and
+voice-conditioning implementation; then design an Android CMake target against
+the exact same ONNX Runtime 1.23.2 native headers/library. Keep the Android
+community project's build setup as reference only. Do not enable synthesis
+until the native build, BOS conditioning, model load, voice prompt, generated
+PCM/WAV, cancellation and device ABI are verified.
