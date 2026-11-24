@@ -124,7 +124,25 @@ jobs:
               -DSPM_BUILD_TEST=OFF
             cmake --build "$BUILD" --target sentencepiece-static --parallel 2
             test -s "$BUILD/src/libsentencepiece.a"
-            echo "SentencePiece v0.2.1 static library built for $ABI."
+            cat > "/tmp/preet-sentencepiece-link-$ABI.cpp" <<'EOF'
+          #include <sentencepiece_processor.h>
+          extern "C" int preet_sentencepiece_link_smoke() {
+            sentencepiece::SentencePieceProcessor processor;
+            return processor.IsInitialized() ? 1 : 0;
+          }
+          EOF
+            case "$ABI" in
+              arm64-v8a) TARGET="aarch64-linux-android29" ;;
+              armeabi-v7a) TARGET="armv7a-linux-androideabi29" ;;
+            esac
+            TOOLCHAIN="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
+            "$TOOLCHAIN/clang++" --target="$TARGET" --sysroot="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/sysroot" \
+              -std=c++17 -fPIC -shared -Wl,--no-undefined \
+              -I/tmp/sentencepiece/src -I"$BUILD/src" -I/tmp/sentencepiece/third_party \
+              "/tmp/preet-sentencepiece-link-$ABI.cpp" "$BUILD/src/libsentencepiece.a" \
+              -llog -landroid -o "/tmp/libpreet_sentencepiece_link_$ABI.so"
+            test -s "/tmp/libpreet_sentencepiece_link_$ABI.so"
+            echo "SentencePiece C++ API compiled and linked for $ABI."
           done
 
       - name: Upload APK artifact
