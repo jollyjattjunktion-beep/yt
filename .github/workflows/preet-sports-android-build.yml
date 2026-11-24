@@ -128,7 +128,7 @@ jobs:
           #include <sentencepiece_processor.h>
           extern "C" int preet_sentencepiece_link_smoke() {
             sentencepiece::SentencePieceProcessor processor;
-            return processor.IsInitialized() ? 1 : 0;
+            return processor.GetPieceSize();
           }
           EOF
             case "$ABI" in
