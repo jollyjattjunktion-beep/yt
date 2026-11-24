@@ -21,8 +21,56 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import java.io.File
+import java.io.RandomAccessFile
 import java.security.MessageDigest
 import java.util.zip.ZipInputStream
+
+/** Accepts the exact PCM format used by the Hindi PocketTTS voice encoder. */
+private fun validatePocketTtsWav(file: File) {
+    require(file.length() in 44L..10L * 1024L * 1024L) {
+        "WAV must be between 44 bytes and 10 MB."
+    }
+    RandomAccessFile(file, "r").use { wav ->
+        fun readFourCc(): String {
+            val bytes = ByteArray(4)
+            wav.readFully(bytes)
+            return String(bytes, Charsets.US_ASCII)
+        }
+        require(readFourCc() == "RIFF") { "File is not a RIFF WAV." }
+        wav.skipBytes(4)
+        require(readFourCc() == "WAVE") { "File is not a WAV audio stream." }
+        var format: Int? = null
+        var channels: Int? = null
+        var sampleRate: Int? = null
+        var bitsPerSample: Int? = null
+        var dataBytes: Long? = null
+        while (wav.filePointer + 8 <= wav.length()) {
+            val chunk = readFourCc()
+            val size = Integer.toUnsignedLong(Integer.reverseBytes(wav.readInt()))
+            val start = wav.filePointer
+            when (chunk) {
+                "fmt " -> if (size >= 16 && start + size <= wav.length()) {
+                    format = java.lang.Short.toUnsignedInt(java.lang.Short.reverseBytes(wav.readShort()))
+                    channels = java.lang.Short.toUnsignedInt(java.lang.Short.reverseBytes(wav.readShort()))
+                    sampleRate = Integer.reverseBytes(wav.readInt())
+                    wav.skipBytes(6)
+                    bitsPerSample = java.lang.Short.toUnsignedInt(java.lang.Short.reverseBytes(wav.readShort()))
+                }
+                "data" -> dataBytes = size
+            }
+            val next = start + size + (size and 1L)
+            if (next > wav.length()) break
+            wav.seek(next)
+        }
+        require(format == 1 && channels == 1 && sampleRate == 24000 && bitsPerSample == 16) {
+            "Use PCM 16-bit, mono, 24 kHz WAV audio."
+        }
+        val durationSeconds = (dataBytes ?: 0L) / (24000L * 2L)
+        require(durationSeconds in 5L..30L) {
+            "Voice prompt must contain 5–30 seconds of audio."
+        }
+    }
+}
 
 /** Copies a user-selected WAV into app-private storage; never uploads the recording. */
 @Composable
@@ -44,11 +92,20 @@ fun VoiceClonePromptCard() {
                 }
                 val folder = File(context.filesDir, "voice-clone").apply { mkdirs() }
                 val target = File(folder, "preet_voice_prompt.wav")
+                val temporary = File(folder, "preet_voice_prompt.wav.tmp")
+                temporary.delete()
                 context.contentResolver.openInputStream(uri).use { input ->
                     requireNotNull(input) { "Could not open selected recording." }
-                    target.outputStream().use { output -> input.copyTo(output) }
+                    temporary.outputStream().use { output -> input.copyTo(output) }
                 }
-                "Voice prompt copied privately (" + (target.length() / 1024) + " KB)."
+                try {
+                    validatePocketTtsWav(temporary)
+                    require(temporary.renameTo(target)) { "Could not save validated voice prompt." }
+                } catch (e: Exception) {
+                    temporary.delete()
+                    throw e
+                }
+                "Private voice prompt verified: PCM 16-bit, mono, 24 kHz."
             } catch (e: Exception) {
                 "Import failed: " + (e.message ?: "unknown error")
             }
