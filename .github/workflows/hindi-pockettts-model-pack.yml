@@ -40,7 +40,10 @@ jobs:
           test -s model-source/onnx/text_conditioner.onnx
           test -s model-source/onnx/tokenizer.model
           test -s model-source/onnx/bos_before_voice.npy
-          test -s model-source/onnx/runtime/README.md || true
+          test -s model-source/onnx/runtime/README.md
+          test -s model-source/onnx/runtime/CMakeLists.txt
+          test -s model-source/onnx/SHA256SUMS
+          test -s model-source/onnx/VALIDATION.md
           du -sh model-source/onnx
 
       - name: Create model pack
