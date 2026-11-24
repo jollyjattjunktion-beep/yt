@@ -31,6 +31,8 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
+    // PocketTTS Android inference runtime; pinned to the same ORT version as its C++ runtime.
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.23.2")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.fasterxml.jackson.core:jackson-core:2.18.2")
     implementation("org.jsoup:jsoup:1.18.3")
