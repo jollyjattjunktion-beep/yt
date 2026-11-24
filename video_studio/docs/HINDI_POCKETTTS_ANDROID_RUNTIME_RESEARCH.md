@@ -179,3 +179,61 @@ the exact same ONNX Runtime 1.23.2 native headers/library. Keep the Android
 community project's build setup as reference only. Do not enable synthesis
 until the native build, BOS conditioning, model load, voice prompt, generated
 PCM/WAV, cancellation and device ABI are verified.
+
+## Exact Hindi runtime C API inspection (2026-11-24)
+
+The current Hindi release's actual `onnx/runtime/pocket_tts.cpp` was inspected,
+not just the upstream base revision. Its exported C API is a seven-argument
+`ptt_create(models_dir, voices_dir, tokenizer_path, precision, temperature,
+lsd_steps, num_threads)`; it also exports:
+
+- `ptt_warmup(handle)`
+- `ptt_set_generation_options(handle, temperature, lsd_steps, eos_threshold,
+  eos_extra_frames, first_chunk_frames, max_chunk_frames)`
+- `ptt_set_append_terminal_punctuation(handle, enabled)`
+- `ptt_stream_start(handle, text, voice_path)`
+- `ptt_stream_start_embedding(handle, text, embedding, frames, dimensions)`
+- `ptt_stream_read(stream, &samples, &sample_count)`
+- `ptt_stream_cancel(stream)` and `ptt_stream_end(stream)`
+- `ptt_free_audio(samples)` and `ptt_destroy(handle)`
+
+This corrects the earlier assumption that the Hindi release's C API still
+needed to be inferred from upstream: its exact seven-argument constructor
+matches the upstream base API, but the Hindi snapshot adds generation-option
+setters and the embedding stream entry point. It is **not** the Android fork's
+nine-argument constructor.
+
+### Android port constraints from the actual source
+
+The file is a single large C++ translation unit that includes ONNX Runtime C++
+and SentencePiece headers, plus embedded implementations of dr_wav, dr_mp3,
+and dr_flac. It also includes POSIX socket headers and a CLI/HTTP-server entry
+point. Android integration must therefore compile it as a shared library with
+the CLI/server entry point disabled, supply the native ONNX Runtime 1.23.2
+headers and ABI-matched shared library, and supply SentencePiece. The build
+must account for Android/Bionic header availability and remove or guard
+server-only socket functionality if Android's NDK build rejects it. Merely
+adding a JNI wrapper around the file is not enough.
+
+The source's stream callback allocates each PCM chunk with `malloc`; consumers
+must release it with `ptt_free_audio`. `ptt_stream_end` joins the worker and
+frees any queued chunks, so JNI cancellation and lifecycle code must not race
+stream destruction or double-free chunks. The source offers a direct
+file-based voice stream and a precomputed embedding stream; use the file-based
+path initially so the Hindi runtime itself performs BOS conditioning from the
+raw WAV prompt. Do not generate or cache embeddings until their BOS-frame
+contract is separately validated.
+
+The source's `ptt_set_append_terminal_punctuation(handle, 0)` must be called
+for this Hindi release. Use conservative initial settings from the published
+smoke test (two threads, temperature 0.3, one flow step, EOS threshold -1.0),
+but treat them as a starting point, not a mobile performance guarantee.
+
+### Next implementation gate
+
+Before JNI implementation, make an Android NDK compile-only experiment for
+the exact source with the server/CLI excluded. Resolve only compiler/linker
+errors required for that target; do not fork or alter model inference logic.
+Then add JNI lifecycle and streaming wrappers, followed by a model-load test
+and a generated-WAV test on an ARM64 Android device. The model's published
+native validation is Linux CPU only and makes no ARM/mobile benchmark claim.
