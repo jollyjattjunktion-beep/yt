@@ -115,6 +115,10 @@ fun VoiceClonePromptCard() {
                 require(manifest.isFile) { "Model ZIP has no SHA256SUMS manifest." }
                 val checksums = manifest.readLines().filter { it.isNotBlank() }
                 require(checksums.isNotEmpty()) { "Model checksum manifest is empty." }
+                val manifestPaths = checksums.map { it.trim().split(Regex("\\s+"), limit = 2).getOrNull(1)?.trim()?.removePrefix("*") }
+                require(required.all { it in manifestPaths }) {
+                    "Checksum manifest does not cover every required model file."
+                }
                 var verified = 0
                 checksums.forEach { line ->
                     val parts = line.trim().split(Regex("\\s+"), limit = 2)
