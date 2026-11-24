@@ -15,21 +15,28 @@ permissions:
 jobs:
   ndk-cmake-smoke:
     runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Android SDK and NDK
-        uses: android-actions/setup-android@v3
-
+      # The hosted Ubuntu runner already provisions Android command-line tools.
+      # Do not call setup-android: it bootstraps the retired "tools" SDK package.
       - name: Install pinned NDK and CMake
+        shell: bash
         run: |
-          sdkmanager "ndk;27.2.12479018" "cmake;3.22.1"
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -n 1)"
+          test -x "$SDKMANAGER"
+          echo "Using $SDKMANAGER"
+          "$SDKMANAGER" "ndk;27.2.12479018" "cmake;3.22.1"
+          test -f "$ANDROID_HOME/ndk/27.2.12479018/build/cmake/android.toolchain.cmake"
 
       - name: Compile JNI shared-library smoke target for ARM64
         run: |
           cmake -S video_studio/mobile/native-smoke \
             -B video_studio/mobile/native-smoke/build-arm64 \
-            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_HOME/ndk/27.2.12479018/build/cmake/android.toolchain.cmake" \
             -DANDROID_ABI=arm64-v8a \
             -DANDROID_PLATFORM=android-29 \
             -DCMAKE_BUILD_TYPE=Release
