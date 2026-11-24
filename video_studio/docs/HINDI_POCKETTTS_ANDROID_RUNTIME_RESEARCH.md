@@ -103,3 +103,38 @@ The Hindi model README also explicitly requires the Hindi BOS-before-voice
 tensor and warns that older runtimes omitting it can terminate synthesis
 prematurely. This must be verified in the exact Hindi source snapshot, not
 assumed from the upstream base revision.
+
+## Native dependency audit of Android reference (2026-11-24)
+
+A second pass over the reference project's Android CMake target, JNI wrapper,
+and native dependency preparation script exposed a version mismatch that must
+be resolved before copying its build setup:
+
+- The reference CMake links an ABI-specific `libonnxruntime.so` and headers
+  from its app tree; it does not link the Kotlin AAR as a substitute.
+- Its preparation script pins ONNX Runtime Android **1.20.0**, verifies the
+  downloaded AAR against a fixed SHA-256, then extracts both the ARM64 native
+  library and headers from that same artifact.
+- Its comments report device-specific SIGILL or severe regressions with
+  several later ORT releases on one Snapdragon 8 Elite test device. This is
+  evidence from that project/device, not proof that those versions fail on
+  this app's target OPPO device.
+- This app currently declares `onnxruntime-android:1.23.2`. Therefore, copying
+  the reference CMake or its dependency script unchanged would create an
+  unreviewed native-vs-managed ORT version split.
+
+The reference's Kotlin wrapper confirms its JNI surface is designed around
+eight configurable constructor values after model/voice paths, plus
+synthesis, stop, and close. That wrapper alone does not establish Hindi model
+compatibility: its source currently selects English/German voices and its
+instrumentation exercises those languages, not the Hindi BOS contract.
+
+### Decision / next gate
+
+Do not import the reference's ORT 1.20.0 binary or downgrade this app based on
+another device's benchmark. First determine the exact ONNX Runtime version
+required by the Hindi ONNX release and validate it on the target Android ABI.
+Then choose one matching managed/native runtime version, pin the native AAR
+hash, and build a small JNI smoke-test target. Hindi BOS conditioning remains
+a separate mandatory gate before speech output can be enabled.
+
