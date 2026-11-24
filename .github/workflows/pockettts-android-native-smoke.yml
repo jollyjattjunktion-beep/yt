@@ -1,0 +1,41 @@
+name: PocketTTS Android NDK Smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "experiment/hindi-pockettts-voice-clone"
+    paths:
+      - "video_studio/mobile/native-smoke/**"
+      - ".github/workflows/pockettts-android-native-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  ndk-cmake-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Android SDK and NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install pinned NDK and CMake
+        run: |
+          sdkmanager "ndk;27.2.12479018" "cmake;3.22.1"
+
+      - name: Compile JNI shared-library smoke target for ARM64
+        run: |
+          cmake -S video_studio/mobile/native-smoke \
+            -B video_studio/mobile/native-smoke/build-arm64 \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-29 \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build video_studio/mobile/native-smoke/build-arm64 --parallel 2
+
+      - name: Verify ARM64 shared library output
+        run: |
+          test -f video_studio/mobile/native-smoke/build-arm64/libpreet_pockettts_native_smoke.so
+          file video_studio/mobile/native-smoke/build-arm64/libpreet_pockettts_native_smoke.so
