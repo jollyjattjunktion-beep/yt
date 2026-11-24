@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import java.io.File
 
 /** Copies a user-selected WAV into app-private storage; never uploads the recording. */
@@ -55,7 +56,7 @@ fun VoiceClonePromptCard() {
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(androidx.compose.ui.unit.dp(8))) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("OFFLINE HINDI VOICE", style = MaterialTheme.typography.titleMedium)
             Text("Import your own clean WAV voice prompt. It stays in this app's private storage.")
             Row {
