@@ -28,6 +28,7 @@ import java.io.File
 import java.io.RandomAccessFile
 import java.security.MessageDigest
 import java.util.zip.ZipInputStream
+import org.json.JSONObject
 
 /** Accepts the exact PCM format used by the Hindi PocketTTS voice encoder. */
 private fun validatePocketTtsWav(file: File) {
@@ -124,10 +125,31 @@ private fun importPocketTtsModel(context: android.content.Context, uri: Uri): St
         val required = listOf(
             "mimi_encoder.onnx", "text_conditioner.onnx",
             "flow_lm_main_int8.onnx", "flow_lm_flow_int8.onnx",
-            "mimi_decoder_int8.onnx", "tokenizer.model", "bos_before_voice.npy"
+            "mimi_decoder_int8.onnx", "tokenizer.model", "bos_before_voice.npy", "bundle.json"
         )
         val missing = required.filterNot { File(staging, it).isFile }
         require(missing.isEmpty()) { "Model ZIP is incomplete: " + missing.joinToString() }
+
+        // Validate the model-specific Hindi runtime contract, not just filenames.
+        val bundleFile = File(staging, "bundle.json")
+        val bundle = JSONObject(bundleFile.readText())
+        require(bundle.optInt("schema_version", -1) == 2) {
+            "Unsupported Hindi model bundle schema."
+        }
+        require(bundle.optString("language") == "hindi") {
+            "Selected model bundle is not the Hindi release."
+        }
+        require(bundle.optString("bos_before_voice_file") == "bos_before_voice.npy" &&
+            bundle.optBoolean("insert_bos_before_voice", false)) {
+            "Hindi voice conditioning requires the BOS-before-voice tensor."
+        }
+        require(bundle.optInt("sample_rate", -1) == 24000 &&
+            bundle.optString("tokenizer_file") == "tokenizer.model") {
+            "Hindi model bundle audio or tokenizer settings are incompatible."
+        }
+        require(bundle.optInt("max_token_per_chunk", -1) == 50) {
+            "Unsupported Hindi model token chunk configuration."
+        }
 
         val manifest = File(staging, "SHA256SUMS")
         require(manifest.isFile) { "Model ZIP has no SHA256SUMS manifest." }
