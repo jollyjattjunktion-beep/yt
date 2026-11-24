@@ -76,11 +76,33 @@ jobs:
           for ABI in arm64-v8a armeabi-v7a; do
             test -s "/tmp/ort-aar-audit/jni/$ABI/libonnxruntime.so"
           done
-          if find /tmp/ort-aar-audit -type f \( -name 'onnxruntime_cxx_api.h' -o -name 'onnxruntime_c_api.h' \) | grep -q .; then
-            echo "C/C++ headers are present in the AAR."
-          else
-            echo "C/C++ headers are not bundled in the Android AAR; native build must fetch matching 1.23.2 headers separately."
-          fi
+          test -s /tmp/ort-aar-audit/headers/onnxruntime_cxx_api.h
+          test -s /tmp/ort-aar-audit/headers/onnxruntime_c_api.h
+          echo "C/C++ headers are present in the AAR."
+          NDK_ROOT="$(find "$ANDROID_HOME/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          TOOLCHAIN="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          test -x "$TOOLCHAIN/clang++"
+          cat > /tmp/ort-link-smoke.cpp <<'EOF'
+          #include <onnxruntime_cxx_api.h>
+          extern "C" int preet_ort_link_smoke() {
+            Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "preet-ort-link-smoke");
+            return env ? 1 : 0;
+          }
+          EOF
+          for ABI in arm64-v8a armeabi-v7a; do
+            case "$ABI" in
+              arm64-v8a) TARGET="aarch64-linux-android29" ;;
+              armeabi-v7a) TARGET="armv7a-linux-androideabi29" ;;
+            esac
+            "$TOOLCHAIN/clang++" --target="$TARGET" --sysroot="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/sysroot" \
+              -std=c++17 -fPIC -shared -Wl,--no-undefined \
+              -I/tmp/ort-aar-audit/headers \
+              /tmp/ort-link-smoke.cpp \
+              -L"/tmp/ort-aar-audit/jni/$ABI" -lonnxruntime -llog -ldl \
+              -o "/tmp/libpreet_ort_link_smoke_$ABI.so"
+            test -s "/tmp/libpreet_ort_link_smoke_$ABI.so"
+            echo "ONNX Runtime C++ API compiled and linked for $ABI."
+          done
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
