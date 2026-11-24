@@ -6,6 +6,7 @@ on:
     branches:
       - "feature/automated-video-studio"
       - "feature/offline-cricket-ai"
+      - "experiment/hindi-pockettts-voice-clone"
     paths:
       - "video_studio/mobile/**"
       - ".github/workflows/preet-sports-android-build.yml"
