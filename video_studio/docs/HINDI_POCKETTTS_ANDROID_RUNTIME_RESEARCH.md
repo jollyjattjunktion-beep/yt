@@ -33,6 +33,32 @@ JNI declarations must match the exact vendored source; mixing these versions wou
 - https://github.com/VolgaGerm/PocketTTS.cpp
 - https://github.com/The-unknown-Shadowman/PocketTTS-Android-Engine
 
+## Android reference implementation review (2026-11-24)
+
+The community Android engine source was inspected directly at its current
+repository revision. Its JNI bridge declares the nine-argument
+`ptt_create(..., sentence_pause_ms, max_text_tokens)` API and also calls
+`ptt_stream_cancel`. Its vendored C++ source implements that same API and
+returns stream chunks allocated with `malloc`, released by `ptt_free_audio`.
+This confirms that the bridge must be pinned together with its matching C++
+source; the seven-argument upstream API is not ABI-compatible.
+
+The inspected Android runtime source contains no implementation or reference
+for the Hindi pack's `bos_before_voice.npy` / `insert_bos_before_voice`
+contract. Therefore, the community Android engine is a useful build/JNI
+reference but is **not yet verified as a compatible Hindi runtime**. Do not
+vendor it as-is or enable synthesis. The next native milestone is a deliberate
+Hindi compatibility port: locate the model's BOS tensor loading/conditioning
+path, add it to this exact runtime revision, and validate output against the
+Hindi release's expected tensor sequence before building the app bridge.
+
+The Android reference's native CMake target also expects an ABI-specific
+`libonnxruntime.so` and headers under its own app tree, plus SentencePiece,
+`dr_libs`, and Sonic. These are not present in this app merely because the
+Kotlin ONNX Runtime AAR dependency exists. Dependency acquisition, licenses,
+ABI packaging, and reproducible hashes must be addressed before adding its
+CMake target.
+
 ## Current decision
 
 Do not copy the reference JNI bridge unchanged and do not enable a fake Generate action. First pin a runtime revision and validate it against the Hindi model graphs, then implement the matching JNI bridge and Android CMake build on this experimental branch only.
