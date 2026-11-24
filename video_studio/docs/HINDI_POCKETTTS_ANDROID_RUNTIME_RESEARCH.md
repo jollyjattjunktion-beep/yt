@@ -237,3 +237,45 @@ errors required for that target; do not fork or alter model inference logic.
 Then add JNI lifecycle and streaming wrappers, followed by a model-load test
 and a generated-WAV test on an ARM64 Android device. The model's published
 native validation is Linux CPU only and makes no ARM/mobile benchmark claim.
+
+## CI coverage boundary and NDK preflight (2026-11-24)
+
+The repository's Android workflow
+`.github/workflows/preet-sports-android-build.yml` currently runs
+`gradle :app:assembleDebug` and uploads the APK. It does not install/configure
+the Android NDK, invoke CMake, build a JNI shared library, inspect packaged
+native ABIs, or run instrumentation tests. A green APK build therefore proves
+the existing Kotlin/Compose app packages, not that PocketTTS native inference
+works.
+
+The current app module also has no `externalNativeBuild` configuration and
+the repository tree has no PocketTTS JNI/CMake source. Do not interpret a
+successful APK workflow as a native compile or Hindi speech test.
+
+### Preflight acceptance criteria for the first NDK change
+
+1. Add a dedicated CMake target under
+   `video_studio/mobile/app/src/main/cpp`; keep it isolated from the normal
+   app build until it compiles.
+2. Pin the exact Hindi release runtime source revision and verify its
+   source-file hash before compilation. Do not silently substitute upstream
+   master or the nine-argument Android fork.
+3. Acquire ONNX Runtime Android 1.23.2 native headers and shared library from
+   one matching official artifact; record and verify its SHA-256. Keep the
+   existing managed AAR at 1.23.2.
+4. Pin SentencePiece and its Android build configuration; compile the source
+   with the desktop CLI/server disabled.
+5. Build at least the verified device ABI, then inspect the APK/AAB contents
+   to confirm `libonnxruntime.so` and the JNI library are packaged for that
+   ABI.
+6. Only after the compile/link gate passes, add JNI lifecycle/stream tests.
+   Model-load and generated-audio tests remain separate runtime gates.
+
+### Current status
+
+- Python/video-studio tests: passing on the latest completed run noted above.
+- Managed Android APK build: previously passed on commit
+  `5160c1943a68b0ae87a5d6938f89ec2e0329512c`; it has not yet been rerun
+  after the most recent documentation-only commits.
+- Android NDK/CMake/JNI compile: not implemented or tested.
+- Physical Android device inference: not tested.
